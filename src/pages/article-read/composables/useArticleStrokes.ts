@@ -18,9 +18,19 @@ export function useArticleStrokes(articleId: string) {
   async function load() {
     try {
       const record = await getArticleDrawing(articleId)
-      const incoming = (record?.strokes ?? []).filter(
-        s => typeof s.paragraphIndex === 'number' && s.paragraphIndex >= 0
-      )
+      const incoming = (record?.strokes ?? [])
+        .filter(
+          (s): s is DrawingStroke =>
+            typeof s.paragraphIndex === 'number' && s.paragraphIndex >= 0
+        )
+        .map((s) => ({
+          id: s.id,
+          paragraphIndex: s.paragraphIndex,
+          color: s.color,
+          width: s.width,
+          points: s.points,
+          createdAt: s.createdAt,
+        }))
 
       // 加载完成前若已有本地笔画，按 id 合并，避免被覆盖丢失
       if (strokes.value.length > 0) {

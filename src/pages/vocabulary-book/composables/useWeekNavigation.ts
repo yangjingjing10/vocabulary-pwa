@@ -1,5 +1,4 @@
 import { ref, computed } from 'vue'
-import { getPromptConfig } from '@/db/repositories/prompt-config.repository'
 
 /**
  * 周导航逻辑
@@ -14,29 +13,11 @@ export function useWeekNavigation() {
   const selectMonth = ref(currentMonth)
   const currentWeekNum = ref(1)
 
-  // 计算当前周数（基于学期开始日期）
-  async function getCurrentWeekNumber(): Promise<number> {
-    try {
-      const promptConfig = await getPromptConfig()
-      const semesterStartDate = promptConfig?.semesterStartDate
-      
-      if (semesterStartDate) {
-        const startDate = new Date(semesterStartDate)
-        const today = new Date()
-        const diffTime = today.getTime() - startDate.getTime()
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
-        const weekNum = Math.floor(diffDays / 7) + 1
-        
-        return Math.max(1, Math.min(weekNum, 20))
-      }
-    } catch (error) {
-      console.log('Using default week calculation')
-    }
-    
-    // 默认按当月日期计算
+  // 按当月日期估算当前周
+  function getCurrentWeekNumber(): number {
     const today = new Date()
     const currentDay = today.getDate()
-    
+
     if (currentDay <= 7) return 1
     if (currentDay <= 14) return 2
     if (currentDay <= 21) return 3
@@ -45,7 +26,7 @@ export function useWeekNavigation() {
 
   // 初始化到当前周
   async function initializeToCurrentWeek() {
-    currentWeekNum.value = await getCurrentWeekNumber()
+    currentWeekNum.value = getCurrentWeekNumber()
     selectYear.value = currentYear
     selectMonth.value = currentMonth
   }

@@ -11,8 +11,8 @@ import {
 export function useDrawingSession() {
   const isActive = ref(false)
   const tool = ref<DrawingTool>('pen')
-  const color = ref(DEFAULT_DRAWING_COLOR)
-  const width = ref(DEFAULT_DRAWING_WIDTH)
+  const color = ref<string>(DEFAULT_DRAWING_COLOR)
+  const width = ref<number>(DEFAULT_DRAWING_WIDTH)
 
   const isIntercepting = computed(
     () => isActive.value && (tool.value === 'pen' || tool.value === 'eraser')

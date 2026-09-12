@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { getWordsByDate } from '@/db/repositories/words.repository'
 
 export interface CarouselWord {
@@ -26,6 +26,8 @@ const currentIndex = ref(0)
 const isAnimating = ref(false)
 const isLoading = ref(true)
 const showMeaning = ref(false)
+/** next = 向左滑出（显示下一个）；prev = 向右滑出（显示上一个） */
+const slideDir = ref<'next' | 'prev'>('next')
 
 let autoTimer: ReturnType<typeof setInterval> | null = null
 let dragStartX = 0
@@ -41,13 +43,11 @@ const isToday = computed(() => activeDate.value === new Date().toISOString().spl
 
 const currentWord = computed(() => words.value[currentIndex.value] ?? null)
 
-/** 只渲染可见的左 / 中 / 右三项，避免几十上百个 DOM */
 const visibleSlots = computed(() => {
   const count = cardCount.value
   if (count === 0) return []
 
   const slots: Array<{
-    key: string
     item: CarouselWord
     index: number
     position: 'left' | 'center' | 'right'
@@ -58,35 +58,15 @@ const visibleSlots = computed(() => {
   const right = (center + 1) % count
 
   if (count === 1) {
-    slots.push({
-      key: `${words.value[center].word}-c-${center}`,
-      item: words.value[center],
-      index: center,
-      position: 'center',
-    })
+    slots.push({ item: words.value[center], index: center, position: 'center' })
     return slots
   }
 
-  slots.push({
-    key: `${words.value[left].word}-l-${left}`,
-    item: words.value[left],
-    index: left,
-    position: 'left',
-  })
-  slots.push({
-    key: `${words.value[center].word}-c-${center}`,
-    item: words.value[center],
-    index: center,
-    position: 'center',
-  })
+  slots.push({ item: words.value[left], index: left, position: 'left' })
+  slots.push({ item: words.value[center], index: center, position: 'center' })
 
   if (count > 2) {
-    slots.push({
-      key: `${words.value[right].word}-r-${right}`,
-      item: words.value[right],
-      index: right,
-      position: 'right',
-    })
+    slots.push({ item: words.value[right], index: right, position: 'right' })
   }
 
   return slots
@@ -125,24 +105,30 @@ async function loadWords() {
   }
 }
 
-function nextWord() {
+async function goTo(dir: 'next' | 'prev') {
   if (isAnimating.value || cardCount.value <= 1) return
   isAnimating.value = true
   showMeaning.value = false
-  currentIndex.value = (currentIndex.value + 1) % cardCount.value
+  slideDir.value = dir
+  await nextTick()
+
+  if (dir === 'next') {
+    currentIndex.value = (currentIndex.value + 1) % cardCount.value
+  } else {
+    currentIndex.value = (currentIndex.value - 1 + cardCount.value) % cardCount.value
+  }
+
   window.setTimeout(() => {
     isAnimating.value = false
-  }, 280)
+  }, 320)
+}
+
+function nextWord() {
+  void goTo('next')
 }
 
 function prevWord() {
-  if (isAnimating.value || cardCount.value <= 1) return
-  isAnimating.value = true
-  showMeaning.value = false
-  currentIndex.value = (currentIndex.value - 1 + cardCount.value) % cardCount.value
-  window.setTimeout(() => {
-    isAnimating.value = false
-  }, 280)
+  void goTo('prev')
 }
 
 function toggleMeaning() {
@@ -178,7 +164,6 @@ function onPointerUp(clientX: number) {
   isDragging = false
   const deltaX = clientX - dragStartX
 
-  // 从右向左滑 = 下一个；从左向右滑 = 上一个
   if (Math.abs(deltaX) < TAP_THRESHOLD) {
     toggleMeaning()
   } else if (deltaX < 0) {
@@ -240,15 +225,16 @@ defineExpose({
     <div
       v-else
       class="word-strip__scene"
+      :class="slideDir === 'next' ? 'is-dir-next' : 'is-dir-prev'"
       @touchstart.passive="onTouchStart"
       @touchend="onTouchEnd"
       @mousedown="onMouseDown"
       @mouseup="onMouseUp"
     >
-      <div class="word-strip__track">
+      <TransitionGroup name="word-slide" tag="div" class="word-strip__track">
         <div
           v-for="slot in visibleSlots"
-          :key="slot.key"
+          :key="slot.index"
           class="word-strip__item"
           :class="`is-${slot.position}`"
         >
@@ -260,7 +246,7 @@ defineExpose({
             {{ slot.item.phonetic }}
           </div>
         </div>
-      </div>
+      </TransitionGroup>
 
       <Transition name="meaning-fade">
         <div v-if="showMeaning" class="word-strip__meaning">
@@ -323,6 +309,7 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .word-strip__item {
@@ -338,9 +325,9 @@ defineExpose({
   text-align: center;
   pointer-events: none;
   transition:
-    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.28s ease,
-    filter 0.28s ease;
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.32s ease,
+    filter 0.32s ease;
   will-change: transform, opacity;
 }
 
@@ -373,6 +360,7 @@ defineExpose({
   line-height: 1.1;
   word-break: break-word;
   color: var(--app-font-color-muted, #64748b);
+  transition: color 0.32s ease, font-size 0.32s ease;
 }
 
 .word-strip__item.is-center .word-strip__word {
@@ -412,6 +400,34 @@ defineExpose({
   font-size: 13px;
   color: var(--app-font-color-soft, #94a3b8);
   opacity: 0.85;
+}
+
+/* 进出场：配合滑动方向 */
+.word-slide-enter-active,
+.word-slide-leave-active {
+  transition:
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.32s ease;
+}
+
+.is-dir-next .word-slide-enter-from {
+  opacity: 0;
+  transform: translate(90%, -50%) scale(0.62);
+}
+
+.is-dir-next .word-slide-leave-to {
+  opacity: 0;
+  transform: translate(-170%, -50%) scale(0.62);
+}
+
+.is-dir-prev .word-slide-enter-from {
+  opacity: 0;
+  transform: translate(-170%, -50%) scale(0.62);
+}
+
+.is-dir-prev .word-slide-leave-to {
+  opacity: 0;
+  transform: translate(90%, -50%) scale(0.62);
 }
 
 .meaning-fade-enter-active,

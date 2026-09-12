@@ -256,11 +256,12 @@ function handleBack() {
         class="quiz-pause-btn"
         type="button"
         :disabled="isPausing || isAnswerLocked"
+        :aria-label="isPausing ? '暂停中' : '暂停测试'"
         title="暂停测试（只检测已答单词）"
         @click="handlePause"
       >
-        <Pause :size="16" />
-        <span>{{ isPausing ? '暂停中...' : '暂停' }}</span>
+        <Loader2 v-if="isPausing" class="is-spinning" :size="18" />
+        <Pause v-else :size="18" />
       </button>
       <div v-else class="quiz-header__spacer" />
     </header>

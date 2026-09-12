@@ -19,7 +19,8 @@ const props = withDefaults(
 )
 
 const AUTO_INTERVAL_MS = 3600
-const TAP_THRESHOLD = 36
+/** 小于该位移视为点按（手机轻微抖动也算点按） */
+const TAP_THRESHOLD = 18
 
 const words = ref<CarouselWord[]>([])
 const currentIndex = ref(0)
@@ -32,6 +33,8 @@ const slideDir = ref<'next' | 'prev'>('next')
 let autoTimer: ReturnType<typeof setInterval> | null = null
 let dragStartX = 0
 let isDragging = false
+/** 触摸结束后忽略合成 mouse 事件，避免点按开关两次导致释义闪一下又没了 */
+let ignoreMouseUntil = 0
 
 const cardCount = computed(() => words.value.length)
 
@@ -183,13 +186,24 @@ function onTouchStart(e: TouchEvent) {
 
 function onTouchEnd(e: TouchEvent) {
   onPointerUp(e.changedTouches[0].clientX)
+  // 阻断随后的 mouseup 二次触发
+  ignoreMouseUntil = Date.now() + 600
+}
+
+function onTouchCancel() {
+  isDragging = false
+  ignoreMouseUntil = Date.now() + 600
+  if (!showMeaning.value) restartAutoRotate()
 }
 
 function onMouseDown(e: MouseEvent) {
+  if (Date.now() < ignoreMouseUntil) return
+  if (e.button !== 0) return
   onPointerDown(e.clientX)
 }
 
 function onMouseUp(e: MouseEvent) {
+  if (Date.now() < ignoreMouseUntil) return
   onPointerUp(e.clientX)
 }
 
@@ -227,7 +241,8 @@ defineExpose({
       class="word-strip__scene"
       :class="slideDir === 'next' ? 'is-dir-next' : 'is-dir-prev'"
       @touchstart.passive="onTouchStart"
-      @touchend="onTouchEnd"
+      @touchend.prevent="onTouchEnd"
+      @touchcancel="onTouchCancel"
       @mousedown="onMouseDown"
       @mouseup="onMouseUp"
     >
@@ -248,12 +263,10 @@ defineExpose({
         </div>
       </TransitionGroup>
 
-      <Transition name="meaning-fade">
-        <div v-if="showMeaning" class="word-strip__meaning">
-          <p v-if="meaningText" class="word-strip__meaning-text">{{ meaningText }}</p>
-          <p v-else class="word-strip__meaning-empty">暂无释义</p>
-        </div>
-      </Transition>
+      <div class="word-strip__meaning" :class="{ 'is-visible': showMeaning }">
+        <p v-if="showMeaning && meaningText" class="word-strip__meaning-text">{{ meaningText }}</p>
+        <p v-else-if="showMeaning" class="word-strip__meaning-empty">暂无释义</p>
+      </div>
 
       <p class="word-strip__meta">{{ metaLabel }}</p>
     </div>
@@ -269,7 +282,9 @@ defineExpose({
   align-items: center;
   justify-content: center;
   user-select: none;
+  -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
+  touch-action: pan-y;
 }
 
 .word-strip__status {
@@ -354,7 +369,7 @@ defineExpose({
 
 .word-strip__word {
   max-width: 100%;
-  font-size: clamp(28px, 7.2vw, 44px);
+  font-size: clamp(32px, 8vw, 50px);
   font-weight: 800;
   letter-spacing: -1px;
   line-height: 1.1;
@@ -364,7 +379,7 @@ defineExpose({
 }
 
 .word-strip__item.is-center .word-strip__word {
-  font-size: clamp(40px, 10vw, 60px);
+  font-size: clamp(52px, 13vw, 78px);
   color: var(--app-font-color, #0f172a);
 }
 
@@ -379,6 +394,15 @@ defineExpose({
   max-width: min(360px, 88vw);
   min-height: 28px;
   text-align: center;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  pointer-events: none;
+}
+
+.word-strip__meaning.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .word-strip__meaning-text {
@@ -428,16 +452,5 @@ defineExpose({
 .is-dir-prev .word-slide-leave-to {
   opacity: 0;
   transform: translate(90%, -50%) scale(0.62);
-}
-
-.meaning-fade-enter-active,
-.meaning-fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.meaning-fade-enter-from,
-.meaning-fade-leave-to {
-  opacity: 0;
-  transform: translateY(4px);
 }
 </style>

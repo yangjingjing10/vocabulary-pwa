@@ -22,8 +22,12 @@ export interface QuizResult {
   word: string
   userAnswer: string
   correctAnswer: string
+  /** 完整释义，结果页回顾用 */
+  translation?: string
   isCorrect: boolean
   direction?: QuizDirection
+  /** 空回车跳过（通常表示不会） */
+  skipped?: boolean
 }
 
 export type QuizStatus = 'loading' | 'testing' | 'grading' | 'completed'

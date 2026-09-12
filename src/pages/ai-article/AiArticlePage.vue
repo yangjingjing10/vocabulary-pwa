@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ArrowLeft, Loader2, Volume2, X, RefreshCw, Sparkles, Pencil } from 'lucide-vue-next'
 
-import { addArticle } from '@/db/repositories/articles.repository'
-import { getApiConfig } from '@/db/repositories/api-config.repository'
-import { getActivePromptConfig } from '@/db/repositories/prompt-config.repository'
 import ParagraphTranslation from '@/pages/article-read/components/ParagraphTranslation.vue'
 import DrawingToolbar from '@/pages/article-read/components/drawing/DrawingToolbar.vue'
 import { useDrawingSession } from '@/pages/article-read/composables/useDrawingSession'
@@ -12,21 +9,14 @@ import {
   ensureLocalDictionary,
   lookupLocalDictionary,
 } from '@/services/local-dictionary.service'
+import { articleGenerationService } from '@/services/article-generation.service'
+import type { Article } from '@/db/schema/database'
+import { speakText } from '@/services/speech.service'
 
 import '@/styles/pages/article-read-page.css'
 
 interface Props {
   selectedWords: string[]
-}
-
-interface Article {
-  id: string
-  title: string
-  content: string
-  words: string[]
-  date: string
-  createdAt: number
-  isNew?: boolean
 }
 
 const props = defineProps<Props>()
@@ -36,10 +26,24 @@ const emit = defineEmits<{
   startPractice: [words: string[]]
 }>()
 
-const isGenerating = ref(false)
-const articles = ref<Article[]>([])
-const showError = ref(false)
-const errorMessage = ref('')
+interface SessionArticle extends Article {
+  isNew?: boolean
+}
+
+const isGenerating = computed(() => articleGenerationService.isGenerating.value)
+const articles = computed<SessionArticle[]>(() =>
+  articleGenerationService.sessionArticles.value.map((a, index) => ({
+    ...a,
+    isNew: index === 0 && articleGenerationService.status.value === 'success',
+  })),
+)
+const showError = computed(
+  () =>
+    articleGenerationService.status.value === 'error' &&
+    articleGenerationService.sessionArticles.value.length === 0,
+)
+const errorMessage = computed(() => articleGenerationService.lastError.value)
+
 const showDefinition = ref(false)
 const selectedWord = ref('')
 const wordDefinition = ref<any>(null)
@@ -54,142 +58,28 @@ const {
   exit: exitDrawingMode,
   setTool: setDrawingTool,
   setColor: setDrawingColor,
-  setWidth: setDrawingWidth
+  setWidth: setDrawingWidth,
 } = useDrawingSession()
 
-onMounted(async () => {
-  await generateArticle()
+onMounted(() => {
+  // 若已有同批会话文章就直接展示；否则后台开生成（离开页也继续）
+  if (articleGenerationService.sessionArticles.value.length === 0) {
+    void articleGenerationService.start(props.selectedWords, { appendToSession: false })
+  } else if (
+    articleGenerationService.status.value !== 'generating' &&
+    JSON.stringify(articleGenerationService.lastWords.value) !== JSON.stringify(props.selectedWords)
+  ) {
+    articleGenerationService.clearSession()
+    void articleGenerationService.start(props.selectedWords, { appendToSession: false })
+  }
 })
 
-function formatContentAsParagraphs(raw: string): string {
-  if (raw.includes('<p>')) return raw
-  return raw
-    .split('\n\n')
-    .filter(para => para.trim())
-    .map(para => `<p>${para.trim()}</p>`)
-    .join('\n')
-}
+onUnmounted(() => {
+  // 故意不取消请求：后台继续生成，完成后由 App 弹窗提醒
+})
 
-function highlightWords(body: string, words: string[]): string {
-  let result = body
-  words.forEach(word => {
-    const regex = new RegExp(`\\b(${word})\\b`, 'gi')
-    result = result.replace(regex, '<mark>$1</mark>')
-  })
-  return result
-}
-
-async function generateArticle() {
-  isGenerating.value = true
-  showError.value = false
-
-  try {
-    const apiConfig = await getApiConfig()
-    const promptConfig = await getActivePromptConfig()
-
-    if (!apiConfig || !apiConfig.apiKey) {
-      throw new Error('Please configure API key first')
-    }
-
-    const systemPrompt = buildSystemPrompt(promptConfig)
-    const userPrompt = buildUserPrompt(props.selectedWords)
-
-    const response = await fetch(`${apiConfig.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiConfig.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: apiConfig.textModel,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.7
-      })
-    })
-
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`)
-    }
-
-    const data = await response.json()
-    const content = data.choices?.[0]?.message?.content
-
-    if (!content) {
-      throw new Error('No content returned from API')
-    }
-
-    const lines = content.split('\n').filter((line: string) => line.trim())
-    const articleTitle = lines[0].replace(/^#+\s*/, '')
-    let articleBody = lines.slice(1).join('\n\n')
-    articleBody = highlightWords(articleBody, props.selectedWords)
-    articleBody = formatContentAsParagraphs(articleBody)
-
-    const today = new Date().toISOString().split('T')[0]
-    const newArticle: Article = {
-      id: `article-${Date.now()}`,
-      title: articleTitle,
-      content: articleBody,
-      words: [...props.selectedWords],
-      date: today,
-      createdAt: Date.now(),
-      isNew: articles.value.length > 0
-    }
-
-    articles.value.unshift(newArticle)
-
-    setTimeout(() => {
-      articles.value.forEach(article => {
-        if (article.id !== newArticle.id) {
-          article.isNew = false
-        }
-      })
-    }, 3000)
-
-    await saveArticleToDb(newArticle)
-  } catch (error) {
-    showError.value = true
-    errorMessage.value = error instanceof Error ? error.message : 'Failed to generate article'
-    console.error('Generation error:', error)
-  } finally {
-    isGenerating.value = false
-  }
-}
-
-function buildSystemPrompt(promptConfig: any) {
-  if (promptConfig && promptConfig.content) {
-    return promptConfig.content
-  }
-
-  return `You are an expert English teacher creating engaging articles for exam preparation. Write naturally and coherently while incorporating the given vocabulary words seamlessly into the content. The article should be well-structured with a clear title.
-
-Important: Start your response with a title on the first line, then write the article body.`
-}
-
-function buildUserPrompt(words: string[]) {
-  const wordCount = Math.max(200, Math.min(800, words.length * 40))
-
-  return `Write an approximately ${wordCount}-word article that naturally incorporates these vocabulary words: ${words.join(', ')}. 
-
-Choose an appropriate theme based on the vocabulary provided. Make the article engaging, coherent, and educational. Use each word naturally in context.`
-}
-
-async function saveArticleToDb(article: Article) {
-  try {
-    await addArticle({
-      id: String(article.id),
-      title: String(article.title),
-      content: String(article.content),
-      words: article.words.map(w => String(w)),
-      date: String(article.date),
-      createdAt: Number(article.createdAt)
-    })
-  } catch (error) {
-    console.error('Failed to save article:', error)
-    throw error
-  }
+function generateArticle() {
+  void articleGenerationService.start(props.selectedWords, { appendToSession: true })
 }
 
 function startPractice() {
@@ -238,8 +128,8 @@ async function fetchDefinition(word: string) {
         meanings: data[0].meanings.slice(0, 2).map((m: any) => ({
           partOfSpeech: m.partOfSpeech,
           definition: m.definitions[0].definition,
-          example: m.definitions[0].example
-        }))
+          example: m.definitions[0].example,
+        })),
       }
     } else {
       wordDefinition.value = {
@@ -248,8 +138,8 @@ async function fetchDefinition(word: string) {
         meanings: [{
           partOfSpeech: '',
           definition: '本地词库与在线词典均未找到该词。',
-          example: ''
-        }]
+          example: '',
+        }],
       }
     }
   } catch {
@@ -259,8 +149,8 @@ async function fetchDefinition(word: string) {
       meanings: [{
         partOfSpeech: '',
         definition: '查词失败，请稍后重试。',
-        example: ''
-      }]
+        example: '',
+      }],
     }
   } finally {
     isLoadingDefinition.value = false
@@ -273,11 +163,7 @@ function closeDefinition() {
 }
 
 function playAudio(word: string) {
-  if ('speechSynthesis' in window) {
-    const utterance = new SpeechSynthesisUtterance(word)
-    utterance.lang = 'en-US'
-    window.speechSynthesis.speak(utterance)
-  }
+  speakText(word)
 }
 
 function formatTime(timestamp: number) {
@@ -296,7 +182,7 @@ function formatTime(timestamp: number) {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
   })
 }
 </script>
@@ -335,7 +221,7 @@ function formatTime(timestamp: number) {
     <main class="article-read-content">
       <div v-if="isGenerating && articles.length === 0" class="article-read-loading">
         <Loader2 class="is-spinning" :size="32" />
-        <p>正在生成文章…</p>
+        <p>正在生成文章…可返回，完成后会提醒你</p>
       </div>
 
       <div v-else-if="showError && articles.length === 0" class="article-read-error">
@@ -347,7 +233,7 @@ function formatTime(timestamp: number) {
       <div v-else class="articles-container">
         <div v-if="isGenerating" class="article-generating-indicator">
           <Loader2 class="is-spinning" :size="20" />
-          <span>正在生成新文章...</span>
+          <span>正在后台生成…离开页面也会继续</span>
         </div>
 
         <article

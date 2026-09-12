@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { AnswerFeedback, QuizQuestion } from '../types/quiz'
+import type { QuizQuestion } from '../types/quiz'
 import { getQuestionPrompt } from '../utils/quizAnswerMatch'
 import WordCarousel from './WordCarousel.vue'
 import WordContextSentences from './WordContextSentences.vue'
@@ -12,32 +12,20 @@ interface Props {
   totalQuestions: number
   currentIndex: number
   modelValue: string
-  feedback?: AnswerFeedback
-  locked?: boolean
 }
 
 interface Emits {
   (e: 'update:modelValue', value: string): void
   (e: 'next'): void
   (e: 'skip'): void
-  (e: 'clear-feedback'): void
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  feedback: null,
-  locked: false,
-})
+const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const userAnswer = computed({
   get: () => props.modelValue,
-  set: (value) => {
-    if (props.locked) return
-    emit('update:modelValue', value)
-    if (props.feedback === 'wrong') {
-      emit('clear-feedback')
-    }
-  },
+  set: (value) => emit('update:modelValue', value),
 })
 
 const carouselWords = computed(() =>
@@ -53,14 +41,8 @@ const placeholder = computed(() =>
     : '输入中文释义回车确认，空回车跳过',
 )
 
-const inputClass = computed(() => ({
-  'quiz-input': true,
-  'is-correct': props.feedback === 'correct',
-  'is-wrong': props.feedback === 'wrong',
-}))
-
 function handleKeyDown(event: KeyboardEvent) {
-  if (event.key !== 'Enter' || props.locked) return
+  if (event.key !== 'Enter') return
   event.preventDefault()
 
   if (userAnswer.value.trim()) {
@@ -93,12 +75,15 @@ function handleKeyDown(event: KeyboardEvent) {
     <div class="quiz-input-panel">
       <div class="quiz-input-wrapper">
         <input
-          v-model="userAnswer"
+          :key="currentIndex"
+          :value="userAnswer"
           type="text"
-          :class="inputClass"
+          class="quiz-input"
           :placeholder="placeholder"
-          :disabled="locked"
           autocomplete="off"
+          enterkeyhint="done"
+          autofocus
+          @input="userAnswer = ($event.target as HTMLInputElement).value"
           @keydown="handleKeyDown"
         />
       </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { registerSW } from 'virtual:pwa-register'
 
 import AiArticlePage from '@/pages/ai-article/AiArticlePage.vue'
@@ -22,6 +22,7 @@ import ChoiceQuizPage from '@/pages/word-quiz/quiz-choice/index.vue'
 import { wallpaperService } from '@/services/wallpaper.service'
 import { fontService } from '@/services/font.service'
 import { ensureLocalDictionary } from '@/services/local-dictionary.service'
+import { articleGenerationService } from '@/services/article-generation.service'
 import { getUserProfile } from '@/db/repositories/user-profile.repository'
 
 import '@/styles/pages/home-page.css'
@@ -40,6 +41,21 @@ onMounted(async () => {
     profileUser.value.avatar = profile.avatar
     profileUser.value.bio = profile.bio
   }
+
+  unsubscribeArticleGen = articleGenerationService.subscribe((event) => {
+    // 只在不在文章页时弹全局提醒，避免重复打扰
+    if (activeView.value === 'article') return
+
+    if (event.status === 'success' && event.article) {
+      showAppToast(`文章已生成：${event.article.title}`, event.article.id)
+    } else if (event.status === 'error') {
+      showAppToast(`文章生成失败：${event.error || '请重试'}`, null, true)
+    }
+  })
+})
+
+onUnmounted(() => {
+  unsubscribeArticleGen?.()
 })
 
 type View = 'study' | 'profile' | 'api' | 'css-index' | 'css-wallpaper' | 'css-font' | 'prompt-index' | 'article-prompt' | 'quiz-prompt' | 'data-backup' | 'import' | 'vocabulary' | 'article' | 'article-read' | 'word-quiz' | 'choice-quiz'
@@ -63,6 +79,30 @@ const profileUser = ref<ProfileUser>({
   masteryRate: 82
 })
 
+const appToast = ref('')
+const appToastArticleId = ref<string | null>(null)
+const appToastIsError = ref(false)
+let appToastTimer: ReturnType<typeof setTimeout> | null = null
+let unsubscribeArticleGen: (() => void) | undefined
+
+function showAppToast(message: string, articleId: string | null = null, isError = false) {
+  appToast.value = message
+  appToastArticleId.value = articleId
+  appToastIsError.value = isError
+  if (appToastTimer) clearTimeout(appToastTimer)
+  appToastTimer = setTimeout(() => {
+    appToast.value = ''
+    appToastArticleId.value = null
+  }, 6000)
+}
+
+function openToastArticle() {
+  if (!appToastArticleId.value) return
+  selectedArticleId.value = appToastArticleId.value
+  activeView.value = 'article-read'
+  appToast.value = ''
+}
+
 function navigate(tab: 'study' | 'home') {
   activeView.value = tab === 'study' ? 'study' : 'profile'
 }
@@ -85,6 +125,8 @@ function backFromImport() {
 function generateArticle(words: string[], date = '') {
   selectedWords.value = words
   selectedDate.value = date
+  // 先清会话再进页，避免旧文章残留；生成由页面/服务后台执行
+  articleGenerationService.clearSession()
   activeView.value = 'article'
 }
 
@@ -193,4 +235,76 @@ async function reloadProfileAfterRestore() {
     :fill-from-pool="choiceFillFromPool"
     @back="activeView = 'vocabulary'"
   />
+
+  <Transition name="app-toast">
+    <div
+      v-if="appToast"
+      class="app-toast"
+      :class="{ 'is-error': appToastIsError }"
+      role="status"
+    >
+      <span class="app-toast__text">{{ appToast }}</span>
+      <button
+        v-if="appToastArticleId"
+        type="button"
+        class="app-toast__action"
+        @click="openToastArticle"
+      >
+        查看
+      </button>
+    </div>
+  </Transition>
 </template>
+
+<style scoped>
+.app-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(92vw, 420px);
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #f8fafc;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.app-toast.is-error {
+  background: rgba(127, 29, 29, 0.94);
+}
+
+.app-toast__text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.app-toast__action {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: #38bdf8;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.app-toast-enter-active,
+.app-toast-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.app-toast-enter-from,
+.app-toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(10px);
+}
+</style>

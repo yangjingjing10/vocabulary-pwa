@@ -5,7 +5,9 @@ interface Props {
   results: QuizResult[]
   accuracy: number
   correctCount: number
+  skippedCount: number
   incorrectResults: QuizResult[]
+  skippedResults: QuizResult[]
 }
 
 interface Emits {
@@ -16,6 +18,11 @@ interface Emits {
 
 defineProps<Props>()
 const emit = defineEmits<Emits>()
+
+function meaningOf(result: QuizResult): string {
+  const text = (result.translation || result.correctAnswer || '').trim()
+  return text.replace(/\\n/g, ' · ') || '暂无释义'
+}
 </script>
 
 <template>
@@ -40,7 +47,11 @@ const emit = defineEmits<Emits>()
       </div>
       <div class="quiz-results__stat">
         <span class="quiz-results__stat-label">错误</span>
-        <span class="quiz-results__stat-value">{{ results.length - correctCount }}</span>
+        <span class="quiz-results__stat-value">{{ incorrectResults.length }}</span>
+      </div>
+      <div class="quiz-results__stat">
+        <span class="quiz-results__stat-label">跳过</span>
+        <span class="quiz-results__stat-value">{{ skippedCount }}</span>
       </div>
     </div>
 
@@ -49,16 +60,43 @@ const emit = defineEmits<Emits>()
       <div class="quiz-results__error-list">
         <div
           v-for="(result, idx) in incorrectResults"
-          :key="idx"
+          :key="`wrong-${idx}`"
           class="quiz-results__error-item"
         >
           <div class="quiz-results__error-question">{{ result.word }}</div>
           <div class="quiz-results__error-answers">
             <div class="quiz-results__error-answer quiz-results__error-answer--wrong">
-              你的答案：{{ result.userAnswer }}
+              你的答案：{{ result.userAnswer || '（空）' }}
             </div>
             <div class="quiz-results__error-answer quiz-results__error-answer--correct">
               正确答案：{{ result.correctAnswer }}
+            </div>
+            <div
+              v-if="result.translation && result.translation !== result.correctAnswer"
+              class="quiz-results__error-answer quiz-results__error-answer--meaning"
+            >
+              释义：{{ meaningOf(result) }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="skippedResults.length > 0" class="quiz-results__errors quiz-results__skipped">
+      <h3>跳过的单词</h3>
+      <div class="quiz-results__error-list">
+        <div
+          v-for="(result, idx) in skippedResults"
+          :key="`skip-${idx}`"
+          class="quiz-results__error-item"
+        >
+          <div class="quiz-results__error-question">{{ result.word }}</div>
+          <div class="quiz-results__error-answers">
+            <div class="quiz-results__error-answer quiz-results__error-answer--skipped">
+              已跳过
+            </div>
+            <div class="quiz-results__error-answer quiz-results__error-answer--correct">
+              释义：{{ meaningOf(result) }}
             </div>
           </div>
         </div>

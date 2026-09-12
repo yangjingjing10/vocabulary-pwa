@@ -39,6 +39,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
+    },
+    // 同名 .js 残留会盖住 .ts（曾导致 getPendingWords is not a function）
+    extensions: ['.mjs', '.mts', '.ts', '.tsx', '.jsx', '.js', '.json', '.vue'],
   }
 })

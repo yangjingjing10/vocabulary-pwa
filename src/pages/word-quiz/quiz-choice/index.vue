@@ -134,7 +134,7 @@ function handleBack() {
       <div v-if="isGenerating" class="choice-loading">
         <Loader2 class="is-spinning" :size="40" />
         <p>正在生成选择题...</p>
-        <p class="choice-loading__hint">优先未练错题 · 每批最多 10 题（分次生成更稳）</p>
+        <p class="choice-loading__hint">优先未练错题 · 每批最多 10 题（每次 3 词更稳）</p>
       </div>
 
       <div v-else-if="errorMessage" class="choice-error">

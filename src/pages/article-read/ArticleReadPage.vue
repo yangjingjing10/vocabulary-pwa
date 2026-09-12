@@ -11,6 +11,7 @@ import {
   ensureLocalDictionary,
   lookupLocalDictionary,
 } from '@/services/local-dictionary.service'
+import { speakText } from '@/services/speech.service'
 
 import '@/styles/pages/article-read-page.css'
 
@@ -192,11 +193,7 @@ function closeDefinition() {
 }
 
 function playAudio(word: string) {
-  if ('speechSynthesis' in window) {
-    const utterance = new SpeechSynthesisUtterance(word)
-    utterance.lang = 'en-US'
-    window.speechSynthesis.speak(utterance)
-  }
+  speakText(word)
 }
 
 function formatTime(timestamp: number) {

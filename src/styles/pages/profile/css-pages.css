@@ -13,9 +13,9 @@
   gap: 12px;
   min-height: 56px;
   padding: 0 16px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid #e2e8f0;
+  background: transparent;
+  backdrop-filter: none;
+  border-bottom: 1px solid transparent;
 }
 
 .css-index-page__back {
@@ -129,9 +129,9 @@
   gap: 12px;
   min-height: 56px;
   padding: 0 16px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid #e2e8f0;
+  background: transparent;
+  backdrop-filter: none;
+  border-bottom: 1px solid transparent;
 }
 
 .wallpaper-page__back {
@@ -621,9 +621,9 @@
   gap: 12px;
   min-height: 56px;
   padding: 0 16px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid #e2e8f0;
+  background: transparent;
+  backdrop-filter: none;
+  border-bottom: 1px solid transparent;
 }
 
 .font-page__back,

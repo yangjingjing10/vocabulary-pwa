@@ -26,9 +26,9 @@
   gap: 12px;
   min-height: 56px;
   padding: 0 16px;
-  background: var(--article-read-surface);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--article-read-border);
+  background: transparent;
+  backdrop-filter: none;
+  border-bottom: 1px solid transparent;
 }
 
 .article-read-icon-button {

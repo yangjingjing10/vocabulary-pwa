@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Volume2 } from 'lucide-vue-next'
 import type { Word } from '../composables/useVocabularyData'
+import { speakText } from '@/services/speech.service'
 
 interface Props {
   word: Word
@@ -13,11 +14,7 @@ const emit = defineEmits<{
 }>()
 
 function playAudio(word: string) {
-  if ('speechSynthesis' in window) {
-    const utterance = new SpeechSynthesisUtterance(word)
-    utterance.lang = 'en-US'
-    window.speechSynthesis.speak(utterance)
-  }
+  speakText(word)
   emit('playAudio', word)
 }
 </script>

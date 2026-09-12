@@ -34,15 +34,16 @@ const {
   userAnswer,
   results,
   correctCount,
+  skippedCount,
   accuracy,
   incorrectResults,
+  skippedResults,
   currentQuestionIndex,
   questions,
   isCompleted,
   isTesting,
   isGrading,
   isLoading,
-  answerFeedback,
   isAnswerLocked,
   initializeQuiz,
   submitCurrentAnswer,
@@ -51,7 +52,6 @@ const {
   setResults,
   retryQuiz,
   setStatus,
-  clearFeedback,
 } = useQuizState(props.words)
 
 const {
@@ -60,8 +60,9 @@ const {
   createBatch,
   loadUnfinishedBatch,
   pauseAndCheck,
-  updateWordAnswer,
-  getUnansweredWords,
+  syncQuestionProgress,
+  markBatchPaused,
+  getPendingWords,
   getCheckedWords,
   clearBatch,
 } = useQuizPause()
@@ -76,20 +77,33 @@ onMounted(async () => {
   const unfinishedBatch = loadUnfinishedBatch()
 
   if (unfinishedBatch) {
-    const remainingWords = getUnansweredWords(unfinishedBatch)
+    const remainingWords = getPendingWords(unfinishedBatch)
 
     if (remainingWords.length > 0) {
       pendingBatch.value = unfinishedBatch
       pendingRemaining.value = remainingWords
       showResumeDialog.value = true
+      // 保持 loading，等用户选「继续 / 新开」
       return
     }
 
     clearBatch()
   }
 
-  await initializeQuiz()
+  await startFreshQuiz()
 })
+
+async function startFreshQuiz() {
+  clearBatch()
+  await initializeQuiz()
+  createBatch(
+    questions.value.map((q) => ({
+      word: q.word,
+      translation: q.translation,
+      direction: q.direction,
+    })),
+  )
+}
 
 function handleResumeContinue() {
   if (!pendingBatch.value) return
@@ -101,10 +115,9 @@ function handleResumeContinue() {
 
 async function handleResumeStartNew() {
   showResumeDialog.value = false
-  clearBatch()
   pendingBatch.value = null
   pendingRemaining.value = []
-  await initializeQuiz()
+  await startFreshQuiz()
 }
 
 function loadUnfinishedTest(batch: QuizBatch, remainingWords: QuizWord[]) {
@@ -113,22 +126,87 @@ function loadUnfinishedTest(batch: QuizBatch, remainingWords: QuizWord[]) {
     word: w.word,
     translation: w.translation || '',
     direction: w.direction || 'en-to-zh',
-    userAnswer: w.userAnswer || '',
+    userAnswer: '',
   }))
 
   currentQuestionIndex.value = 0
   userAnswer.value = ''
-  answerFeedback.value = null
   setStatus('testing')
 }
 
+function persistQuestionByRef(
+  question: {
+    word: string
+    translation: string
+    direction: 'en-to-zh' | 'zh-to-en'
+    userAnswer: string
+    gradeResult?: { isCorrect: boolean; correctAnswer: string }
+  },
+  skipped: boolean,
+) {
+  if (!currentBatch.value || !question.gradeResult) return
+
+  syncQuestionProgress(currentBatch.value, {
+    word: question.word,
+    translation: question.translation,
+    direction: question.direction,
+    userAnswer: skipped ? '' : question.userAnswer,
+    skipped,
+    gradeResult: question.gradeResult,
+  })
+}
+
+function batchWordToResult(word: QuizWord): QuizResult {
+  const skipped = Boolean(word.skipped)
+  return {
+    word: word.word,
+    userAnswer: skipped ? '' : word.userAnswer,
+    correctAnswer:
+      word.aiResult?.correctAnswer ||
+      getCorrectAnswer({
+        word: word.word,
+        translation: word.translation || '',
+        direction: word.direction || 'en-to-zh',
+      }),
+    translation: word.translation,
+    isCorrect: skipped ? false : Boolean(word.aiResult?.correct),
+    direction: word.direction,
+    skipped,
+  }
+}
+
 function finishWithLocalResults() {
-  setResults(collectGradedResults())
+  // 先把本轮最后几题写入 batch
+  questions.value.forEach((q) => {
+    if (!q.gradeResult || !currentBatch.value) return
+    persistQuestionByRef(q, !q.userAnswer.trim())
+  })
+
+  const sessionResults = collectGradedResults()
+  const sessionWords = new Set(sessionResults.map((r) => r.word))
+
+  // 合并暂停前已完成的题，避免续测后结果页只剩后半段
+  const earlierResults =
+    currentBatch.value
+      ? getCheckedWords(currentBatch.value)
+          .filter((w) => !sessionWords.has(w.word))
+          .map(batchWordToResult)
+      : []
+
+  setResults([...earlierResults, ...sessionResults])
   clearBatch()
 }
 
-async function handleNext() {
-  const outcome = await submitCurrentAnswer()
+function handleNext() {
+  const indexBefore = currentQuestionIndex.value
+  const question = questions.value[indexBefore]
+  const outcome = submitCurrentAnswer()
+
+  if (outcome === 'rejected' || outcome === 'skipped-empty') return
+
+  if (question?.gradeResult) {
+    persistQuestionByRef(question, false)
+  }
 
   if (outcome === 'finished') {
     finishWithLocalResults()
@@ -136,46 +214,62 @@ async function handleNext() {
 }
 
 function handleSkip() {
-  const hasNext = skipQuestion()
+  const indexBefore = currentQuestionIndex.value
+  const question = questions.value[indexBefore]
+  const outcome = skipQuestion()
 
-  if (!hasNext) {
+  if (outcome === 'rejected') return
+
+  if (question?.gradeResult) {
+    persistQuestionByRef(question, true)
+  }
+
+  if (outcome === 'finished') {
     finishWithLocalResults()
   }
 }
 
 async function handlePause() {
+  // 确保有 batch，并把当前页面上已处理的题都同步进去
   if (!currentBatch.value) {
-    const batch = createBatch(
+    createBatch(
       questions.value.map((q) => ({
         word: q.word,
         translation: q.translation,
         direction: q.direction,
       })),
     )
+  }
 
-    questions.value.forEach((q, index) => {
-      const wordId = batch.words[index].id
-      // 已正确确认的题写入答案；当前正在改的错题也按当前输入同步
-      if (q.userAnswer.trim()) {
-        updateWordAnswer(batch, wordId, q.userAnswer)
-      }
+  const batch = currentBatch.value!
+  questions.value.forEach((q) => {
+    if (!q.gradeResult) return
+    const skipped = !q.userAnswer.trim()
+    syncQuestionProgress(batch, {
+      word: q.word,
+      translation: q.translation,
+      direction: q.direction,
+      userAnswer: skipped ? '' : q.userAnswer,
+      skipped,
+      gradeResult: q.gradeResult,
     })
-  } else {
-    questions.value.forEach((q) => {
-      if (!currentBatch.value) return
-      const target = currentBatch.value.words.find((w) => w.word === q.word)
-      if (!target) return
-      target.translation = q.translation
-      target.direction = q.direction
-      if (q.userAnswer.trim()) {
-        updateWordAnswer(currentBatch.value, target.id, q.userAnswer)
-      }
+  })
+
+  // 当前输入框里未提交的内容也暂存，避免丢进度
+  const current = questions.value[currentQuestionIndex.value]
+  if (current && !current.gradeResult && userAnswer.value.trim()) {
+    syncQuestionProgress(batch, {
+      word: current.word,
+      translation: current.translation,
+      direction: current.direction,
+      userAnswer: userAnswer.value.trim(),
+      skipped: false,
     })
   }
 
   try {
     setStatus('grading')
-    const result = await pauseAndCheck(currentBatch.value!)
+    const result = await pauseAndCheck(batch)
     pauseResult.value = result
     showPausePanel.value = true
     setStatus('testing')
@@ -196,30 +290,31 @@ function handleViewPauseResults() {
   const checkedWords = getCheckedWords(currentBatch.value)
   const quizResults: QuizResult[] = checkedWords.map((word) => ({
     word: word.word,
-    userAnswer: word.userAnswer,
+    userAnswer: word.skipped ? '' : word.userAnswer,
     correctAnswer: word.aiResult?.correctAnswer || getCorrectAnswer({
       word: word.word,
       translation: word.translation || '',
       direction: word.direction || 'en-to-zh',
     }),
-    isCorrect: word.aiResult?.correct || false,
+    translation: word.translation,
+    isCorrect: word.skipped ? false : Boolean(word.aiResult?.correct),
     direction: word.direction,
+    skipped: Boolean(word.skipped),
   }))
 
   setResults(quizResults)
+  clearBatch()
 }
 
 function handleContinueTest() {
   showPausePanel.value = false
 
-  if (!currentBatch.value) {
-    return
-  }
+  if (!currentBatch.value) return
 
-  const remainingWords = getUnansweredWords(currentBatch.value)
+  const remainingWords = getPendingWords(currentBatch.value)
 
   if (remainingWords.length === 0) {
-    alert('没有剩余单词了！')
+    handleViewPauseResults()
     return
   }
 
@@ -227,20 +322,42 @@ function handleContinueTest() {
 }
 
 function handleClosePausePanel() {
+  // 关闭弹窗视为确认暂停并离开进度已保存
+  if (currentBatch.value) {
+    markBatchPaused(currentBatch.value)
+  }
   showPausePanel.value = false
 }
 
 async function handleRetry() {
-  clearBatch()
-  await retryQuiz()
+  await startFreshQuiz()
 }
 
 function handleGoToAdvancedPractice() {
-  const wrongWords = incorrectResults.value.map((r) => r.word)
+  const wrongWords = [
+    ...incorrectResults.value.map((r) => r.word),
+    ...skippedResults.value.map((r) => r.word),
+  ]
   emit('advancedPractice', props.words, wrongWords, props.date)
 }
 
 function handleBack() {
+  // 返回前把已做进度落盘，下次可续测
+  if (currentBatch.value && !isCompleted.value) {
+    questions.value.forEach((q) => {
+      if (!q.gradeResult || !currentBatch.value) return
+      const skipped = !q.userAnswer.trim()
+      syncQuestionProgress(currentBatch.value, {
+        word: q.word,
+        translation: q.translation,
+        direction: q.direction,
+        userAnswer: skipped ? '' : q.userAnswer,
+        skipped,
+        gradeResult: q.gradeResult,
+      })
+    })
+    markBatchPaused(currentBatch.value)
+  }
   emit('back')
 }
 </script>
@@ -267,7 +384,7 @@ function handleBack() {
     </header>
 
     <main class="quiz-content">
-      <div v-if="isLoading" class="quiz-loading">
+      <div v-if="isLoading && !showResumeDialog" class="quiz-loading">
         <Loader2 class="is-spinning" :size="48" />
         <p>正在准备题目...</p>
         <p class="quiz-loading__hint">英译中 / 中译英 五五开</p>
@@ -281,11 +398,8 @@ function handleBack() {
         :progress="progress"
         :total-questions="questions.length"
         :current-index="currentQuestionIndex"
-        :feedback="answerFeedback"
-        :locked="isAnswerLocked"
         @next="handleNext"
         @skip="handleSkip"
-        @clear-feedback="clearFeedback"
       />
 
       <div v-else-if="isGrading" class="quiz-loading">
@@ -301,7 +415,9 @@ function handleBack() {
         :results="results"
         :accuracy="accuracy"
         :correct-count="correctCount"
+        :skipped-count="skippedCount"
         :incorrect-results="incorrectResults"
+        :skipped-results="skippedResults"
         @retry="handleRetry"
         @advancedPractice="handleGoToAdvancedPractice"
         @back="handleBack"

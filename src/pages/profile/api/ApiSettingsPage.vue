@@ -1,11 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { ArrowLeft, ArrowDown, ArrowUp, Book, Check, Eye, EyeOff, KeyRound, LoaderCircle, Plus, Save, Trash2, Zap } from 'lucide-vue-next'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { ArrowLeft, ArrowDown, ArrowUp, Book, Check, Eye, EyeOff, KeyRound, LoaderCircle, Plus, Save, Trash2, Volume2, Zap } from 'lucide-vue-next'
 
 import { getApiConfig, saveApiConfig } from '@/db/repositories/api-config.repository'
 import { deleteDictionaryApiConfig, getAllDictionaryApiConfigs, saveDictionaryApiConfig } from '@/db/repositories/dictionary-api-config.repository'
 import type { DictionaryApiConfig } from '@/db/schema/database'
 import { queryWordDefinition } from '@/services/dictionary-api.service'
+import {
+  getSpeechRate,
+  getSelectedVoiceURI,
+  loadSpeechVoices,
+  setSpeechRate,
+  setSpeechVoiceURI,
+  speakText,
+  speechSettings,
+  stopSpeaking,
+} from '@/services/speech.service'
 
 import '@/styles/pages/profile/api-settings-page.css'
 
@@ -76,6 +86,12 @@ const showDictApiKey = ref<Record<string, boolean>>({})
 const isTestingDict = ref<Record<string, boolean>>({})
 const dictTestResults = ref<Record<string, { success: boolean; message: string }>>({})
 
+const speechVoiceURI = ref(getSelectedVoiceURI())
+const speechRateLocal = ref(getSpeechRate())
+const speechVoices = computed(() => speechSettings.availableVoices.value)
+const speechSupported = ref(typeof window !== 'undefined' && 'speechSynthesis' in window)
+const previewWord = ref('vocabulary')
+
 const effectiveTextModel = computed(() => config.value.textModel === 'custom' ? customTextModel.value : config.value.textModel)
 
 onMounted(async () => {
@@ -97,7 +113,28 @@ onMounted(async () => {
     showToast('Config loaded')
   }
   await loadDictionaryConfigs()
+  await loadSpeechVoices()
+  speechVoiceURI.value = getSelectedVoiceURI()
+  speechRateLocal.value = getSpeechRate()
 })
+
+onUnmounted(() => {
+  stopSpeaking()
+})
+
+function onSpeechVoiceChange() {
+  setSpeechVoiceURI(speechVoiceURI.value)
+  showToast(speechVoiceURI.value ? '发音音色已保存' : '已改回自动选择')
+}
+
+function onSpeechRateChange() {
+  setSpeechRate(speechRateLocal.value)
+}
+
+function previewSpeech() {
+  const sample = previewWord.value.trim() || 'vocabulary'
+  speakText(sample)
+}
 
 async function loadDictionaryConfigs() {
   dictionaryConfigs.value = await getAllDictionaryApiConfigs()
@@ -434,6 +471,67 @@ async function testDictionaryApi(config: DictionaryApiConfig) {
             <span>{{ visionFetchStatusMessage }}</span>
           </p>
         </div>
+      </section>
+
+      <section class="api-card">
+        <div class="api-card__heading">
+          <div class="api-card__heading-mark"><Volume2 :size="16" /></div>
+          <div>
+            <h2>浏览器发音</h2>
+            <p>选择系统自带英文音色，改善听筒朗读听感</p>
+          </div>
+        </div>
+
+        <template v-if="speechSupported">
+          <label class="api-field">
+            <span>音色</span>
+            <select v-model="speechVoiceURI" class="api-field__input" @change="onSpeechVoiceChange">
+              <option value="">自动（优先自然英文）</option>
+              <option
+                v-for="voice in speechVoices"
+                :key="voice.voiceURI"
+                :value="voice.voiceURI"
+              >
+                {{ voice.label }}
+              </option>
+            </select>
+          </label>
+
+          <label class="api-field">
+            <span>语速 {{ speechRateLocal.toFixed(2) }}</span>
+            <input
+              v-model.number="speechRateLocal"
+              class="api-speech-rate"
+              type="range"
+              min="0.7"
+              max="1.15"
+              step="0.05"
+              @change="onSpeechRateChange"
+            />
+          </label>
+
+          <div class="api-speech-preview">
+            <input
+              v-model="previewWord"
+              class="api-field__input"
+              type="text"
+              placeholder="试听单词"
+              maxlength="40"
+            />
+            <button class="api-fetch-button" type="button" @click="previewSpeech">
+              <Volume2 :size="14" />
+              试听
+            </button>
+          </div>
+
+          <p class="api-feedback is-success" style="opacity: 0.85">
+            <span>提示：Windows 可优先试 Microsoft Aria / Jenny；手机可试 Google US English。列表来自本机系统，不同设备不同。</span>
+          </p>
+        </template>
+
+        <p v-else class="api-feedback">
+          <span>当前浏览器不支持语音合成</span>
+        </p>
       </section>
 
       <section class="api-section">

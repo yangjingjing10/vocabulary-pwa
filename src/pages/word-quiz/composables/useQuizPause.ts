@@ -27,6 +27,7 @@ export function useQuizPause() {
       direction: seed.direction || 'en-to-zh',
       userAnswer: '',
       answeredAt: undefined,
+      skipped: false,
     }))
 
     const batch: QuizBatch = {
@@ -51,6 +52,11 @@ export function useQuizPause() {
       const batch: QuizBatch = JSON.parse(stored)
 
       if (batch.status === 'ongoing' || batch.status === 'paused') {
+        // 还有未处理的题才算未完成
+        if (getPendingWords(batch).length === 0) {
+          localStorage.removeItem(STORAGE_KEY)
+          return null
+        }
         currentBatch.value = batch
         return batch
       }
@@ -75,18 +81,83 @@ export function useQuizPause() {
     localStorage.removeItem(STORAGE_KEY)
   }
 
+  /** 用户已作答、等待/已完成判题 */
   function getAnsweredWords(batch: QuizBatch): QuizWord[] {
     return batch.words.filter(
-      (w) => w.userAnswer && w.userAnswer.trim() !== '' && !w.aiResult,
+      (w) => !w.skipped && Boolean(w.userAnswer?.trim()) && !w.aiResult,
     )
   }
 
+  /** 仍需继续作答的题（未答且未跳过） */
+  function getPendingWords(batch: QuizBatch): QuizWord[] {
+    return batch.words.filter((w) => {
+      if (w.skipped) return false
+      if (w.aiResult) return false
+      if (w.userAnswer && w.userAnswer.trim() !== '') return false
+      return true
+    })
+  }
+
+  /** @deprecated 使用 getPendingWords；保留别名避免旧调用报错 */
   function getUnansweredWords(batch: QuizBatch): QuizWord[] {
-    return batch.words.filter((w) => !w.userAnswer || w.userAnswer.trim() === '')
+    return getPendingWords(batch)
   }
 
   function getCheckedWords(batch: QuizBatch): QuizWord[] {
-    return batch.words.filter((w) => w.aiResult !== undefined)
+    return batch.words.filter((w) => w.aiResult !== undefined || w.skipped)
+  }
+
+  function findWord(batch: QuizBatch, word: string): QuizWord | undefined {
+    return batch.words.find((w) => w.word === word)
+  }
+
+  /** 同步单题进度到 batch 并立即落盘 */
+  function syncQuestionProgress(
+    batch: QuizBatch,
+    payload: {
+      word: string
+      translation?: string
+      direction?: QuizDirection
+      userAnswer?: string
+      skipped?: boolean
+      gradeResult?: { isCorrect: boolean; correctAnswer: string }
+    },
+  ) {
+    const target = findWord(batch, payload.word)
+    if (!target) return
+
+    if (payload.translation !== undefined) target.translation = payload.translation
+    if (payload.direction !== undefined) target.direction = payload.direction
+
+    if (payload.skipped) {
+      target.skipped = true
+      target.userAnswer = ''
+      target.answeredAt = Date.now()
+      target.aiResult = {
+        correct: false,
+        correctAnswer: payload.gradeResult?.correctAnswer || getCorrectAnswer({
+          word: target.word,
+          translation: target.translation || '',
+          direction: target.direction || 'en-to-zh',
+        }),
+      }
+    } else if (payload.userAnswer !== undefined) {
+      target.skipped = false
+      target.userAnswer = payload.userAnswer
+      target.answeredAt = Date.now()
+      if (payload.gradeResult) {
+        target.aiResult = {
+          correct: payload.gradeResult.isCorrect,
+          correctAnswer: payload.gradeResult.correctAnswer,
+        }
+      }
+    }
+
+    batch.status = 'ongoing'
+    batch.answeredCount = batch.words.filter(
+      (w) => w.skipped || Boolean(w.userAnswer?.trim()) || w.aiResult,
+    ).length
+    saveBatchToStorage(batch)
   }
 
   async function pauseAndCheck(batch: QuizBatch): Promise<QuizPauseResult> {
@@ -94,45 +165,33 @@ export function useQuizPause() {
 
     try {
       const answeredWords = getAnsweredWords(batch)
-      const unansweredWords = getUnansweredWords(batch)
+      const pendingWords = getPendingWords(batch)
 
-      if (answeredWords.length === 0) {
-        batch.status = 'paused'
-        batch.pausedAt = Date.now()
-        saveBatchToStorage(batch)
-
-        return {
-          batchId: batch.batchId,
-          checkedCount: 0,
-          correctCount: 0,
-          remainingCount: unansweredWords.length,
-          results: [],
-        }
+      if (answeredWords.length > 0) {
+        const checkedResults = gradeAnsweredWords(answeredWords)
+        checkedResults.forEach((result) => {
+          const wordIndex = batch.words.findIndex((w) => w.id === result.id)
+          if (wordIndex !== -1) {
+            batch.words[wordIndex] = result
+          }
+        })
       }
-
-      const checkedResults = gradeAnsweredWords(answeredWords)
-
-      checkedResults.forEach((result) => {
-        const wordIndex = batch.words.findIndex((w) => w.id === result.id)
-        if (wordIndex !== -1) {
-          batch.words[wordIndex] = result
-        }
-      })
 
       batch.status = 'paused'
       batch.pausedAt = Date.now()
       batch.answeredCount = getCheckedWords(batch).length
 
-      const correctCount = checkedResults.filter((r) => r.aiResult?.correct).length
+      const checked = getCheckedWords(batch).filter((w) => !w.skipped)
+      const correctCount = checked.filter((r) => r.aiResult?.correct).length
 
       saveBatchToStorage(batch)
 
       return {
         batchId: batch.batchId,
-        checkedCount: answeredWords.length,
+        checkedCount: checked.length,
         correctCount,
-        remainingCount: unansweredWords.length,
-        results: checkedResults,
+        remainingCount: pendingWords.length,
+        results: checked,
       }
     } catch (error) {
       console.error('Pause and check failed:', error)
@@ -148,43 +207,20 @@ export function useQuizPause() {
     try {
       const answeredWords = getAnsweredWords(batch)
 
-      if (answeredWords.length === 0) {
-        batch.status = 'finished'
-        batch.finishedAt = Date.now()
-
-        const allChecked = getCheckedWords(batch)
-        const correctCount = allChecked.filter((w) => w.aiResult?.correct).length
-
-        batch.correctCount = correctCount
-        batch.accuracy =
-          allChecked.length > 0
-            ? Math.round((correctCount / allChecked.length) * 100)
-            : 0
-
-        saveBatchToStorage(batch)
-
-        return {
-          batchId: batch.batchId,
-          checkedCount: 0,
-          correctCount,
-          remainingCount: 0,
-          results: allChecked,
-        }
+      if (answeredWords.length > 0) {
+        const checkedResults = gradeAnsweredWords(answeredWords)
+        checkedResults.forEach((result) => {
+          const wordIndex = batch.words.findIndex((w) => w.id === result.id)
+          if (wordIndex !== -1) {
+            batch.words[wordIndex] = result
+          }
+        })
       }
-
-      const checkedResults = gradeAnsweredWords(answeredWords)
-
-      checkedResults.forEach((result) => {
-        const wordIndex = batch.words.findIndex((w) => w.id === result.id)
-        if (wordIndex !== -1) {
-          batch.words[wordIndex] = result
-        }
-      })
 
       batch.status = 'finished'
       batch.finishedAt = Date.now()
 
-      const allChecked = getCheckedWords(batch)
+      const allChecked = getCheckedWords(batch).filter((w) => !w.skipped)
       const correctCount = allChecked.filter((w) => w.aiResult?.correct).length
 
       batch.answeredCount = allChecked.length
@@ -211,7 +247,6 @@ export function useQuizPause() {
     }
   }
 
-  /** 本地词典判题（同步） */
   function gradeAnsweredWords(words: QuizWord[]): QuizWord[] {
     return words.map((w) => {
       const direction = w.direction || 'en-to-zh'
@@ -235,8 +270,15 @@ export function useQuizPause() {
     if (wordIndex !== -1) {
       batch.words[wordIndex].userAnswer = answer
       batch.words[wordIndex].answeredAt = Date.now()
+      batch.words[wordIndex].skipped = false
       saveBatchToStorage(batch)
     }
+  }
+
+  function markBatchPaused(batch: QuizBatch) {
+    batch.status = 'paused'
+    batch.pausedAt = Date.now()
+    saveBatchToStorage(batch)
   }
 
   const batchStats = computed(() => {
@@ -245,7 +287,7 @@ export function useQuizPause() {
     const batch = currentBatch.value
     const checked = getCheckedWords(batch)
     const answered = getAnsweredWords(batch)
-    const unanswered = getUnansweredWords(batch)
+    const unanswered = getPendingWords(batch)
 
     return {
       total: batch.words.length,
@@ -266,8 +308,12 @@ export function useQuizPause() {
     pauseAndCheck,
     finishAndCheck,
     updateWordAnswer,
+    syncQuestionProgress,
+    markBatchPaused,
     getAnsweredWords,
     getUnansweredWords,
+    getPendingWords,
     getCheckedWords,
+    saveBatchToStorage,
   }
 }

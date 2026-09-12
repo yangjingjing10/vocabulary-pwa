@@ -7,9 +7,6 @@ import {
   resolveTranslations,
 } from '../utils/quizAnswerMatch'
 
-const CORRECT_FLASH_MS = 900
-const WRONG_FLASH_MS = 900
-
 /**
  * 单词测试状态管理
  */
@@ -32,13 +29,21 @@ export function useQuizState(initialWords: string[]) {
     results.value.filter((r) => r.isCorrect).length,
   )
 
+  const skippedCount = computed(() =>
+    results.value.filter((r) => r.skipped).length,
+  )
+
   const accuracy = computed(() => {
     if (results.value.length === 0) return 0
     return Math.round((correctCount.value / results.value.length) * 100)
   })
 
   const incorrectResults = computed(() =>
-    results.value.filter((r) => !r.isCorrect),
+    results.value.filter((r) => !r.isCorrect && !r.skipped),
+  )
+
+  const skippedResults = computed(() =>
+    results.value.filter((r) => r.skipped),
   )
 
   const isCompleted = computed(() => status.value === 'completed')
@@ -57,9 +62,6 @@ export function useQuizState(initialWords: string[]) {
     }))
   }
 
-  /**
-   * 初始化测试：本地词典补释义 + 英中五五开
-   */
   async function initializeQuiz() {
     status.value = 'loading'
     answerFeedback.value = null
@@ -79,80 +81,77 @@ export function useQuizState(initialWords: string[]) {
   }
 
   function clearFeedback() {
-    if (answerFeedback.value === 'wrong') {
-      answerFeedback.value = null
-    }
+    answerFeedback.value = null
   }
 
   /**
-   * 提交当前答案：对/错都闪烁后进入下一题
+   * 提交：先记分，再切题；最后一题直接 finished
    */
-  async function submitCurrentAnswer(): Promise<'advanced' | 'finished' | 'rejected' | 'skipped-empty'> {
-    if (isAnswerLocked.value) return 'rejected'
-
+  function submitCurrentAnswer(): 'advanced' | 'finished' | 'rejected' | 'skipped-empty' {
     const answer = userAnswer.value.trim()
     if (!answer) return 'skipped-empty'
 
-    const question = questions.value[currentQuestionIndex.value]
+    const index = currentQuestionIndex.value
+    const question = questions.value[index]
     if (!question) return 'rejected'
 
-    const isCorrect = checkQuizAnswer(question, answer)
-    const correctAnswer = getCorrectAnswer(question)
-
     question.userAnswer = answer
-    question.gradeResult = { isCorrect, correctAnswer }
-
-    answerFeedback.value = isCorrect ? 'correct' : 'wrong'
-    isAnswerLocked.value = true
-    await sleep(isCorrect ? CORRECT_FLASH_MS : WRONG_FLASH_MS)
-    isAnswerLocked.value = false
-    answerFeedback.value = null
-    userAnswer.value = ''
-
-    if (currentQuestionIndex.value < questions.value.length - 1) {
-      currentQuestionIndex.value++
-      return 'advanced'
-    }
-
-    return 'finished'
-  }
-
-  /**
-   * 跳过当前题（不保存答案）
-   */
-  function skipQuestion() {
-    if (isAnswerLocked.value) return false
-
-    const question = questions.value[currentQuestionIndex.value]
-    if (question) {
-      question.userAnswer = ''
-      question.gradeResult = undefined
+    question.gradeResult = {
+      isCorrect: checkQuizAnswer(question, answer),
+      correctAnswer: getCorrectAnswer(question),
     }
 
     userAnswer.value = ''
     answerFeedback.value = null
 
-    if (currentQuestionIndex.value < questions.value.length - 1) {
-      currentQuestionIndex.value++
-      return true
+    if (index >= questions.value.length - 1) {
+      return 'finished'
     }
 
-    return false
+    currentQuestionIndex.value = index + 1
+    return 'advanced'
   }
 
   /**
-   * 从已作答题目汇总结果（本地判题，无需 AI）
+   * 跳过：记为不会，结果页展示释义
    */
+  function skipQuestion(): 'advanced' | 'finished' | 'rejected' {
+    const index = currentQuestionIndex.value
+    const question = questions.value[index]
+    if (!question) return 'rejected'
+
+    question.userAnswer = ''
+    question.gradeResult = {
+      isCorrect: false,
+      correctAnswer: getCorrectAnswer(question),
+    }
+
+    userAnswer.value = ''
+    answerFeedback.value = null
+
+    if (index >= questions.value.length - 1) {
+      return 'finished'
+    }
+
+    currentQuestionIndex.value = index + 1
+    return 'advanced'
+  }
+
   function collectGradedResults(): QuizResult[] {
     return questions.value
-      .filter((q) => q.userAnswer.trim() !== '' && q.gradeResult)
-      .map((q) => ({
-        word: q.word,
-        userAnswer: q.userAnswer,
-        correctAnswer: q.gradeResult!.correctAnswer,
-        isCorrect: q.gradeResult!.isCorrect,
-        direction: q.direction,
-      }))
+      .filter((q) => q.gradeResult)
+      .map((q) => {
+        const skipped = !q.userAnswer.trim()
+        return {
+          word: q.word,
+          userAnswer: skipped ? '' : q.userAnswer,
+          correctAnswer: q.gradeResult!.correctAnswer,
+          translation: q.translation,
+          isCorrect: skipped ? false : q.gradeResult!.isCorrect,
+          direction: q.direction,
+          skipped,
+        }
+      })
   }
 
   function setResults(gradedResults: QuizResult[]) {
@@ -179,7 +178,7 @@ export function useQuizState(initialWords: string[]) {
 
   function getAnsweredQuestions() {
     return questions.value
-      .filter((q) => q.userAnswer.trim() !== '')
+      .filter((q) => q.gradeResult)
       .map((q) => ({
         word: q.word,
         translation: q.translation,
@@ -205,8 +204,10 @@ export function useQuizState(initialWords: string[]) {
     currentQuestion,
     progress,
     correctCount,
+    skippedCount,
     accuracy,
     incorrectResults,
+    skippedResults,
     isCompleted,
     isTesting,
     isGrading,
@@ -222,8 +223,4 @@ export function useQuizState(initialWords: string[]) {
     setStatus,
     clearFeedback,
   }
-}
-
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms))
 }

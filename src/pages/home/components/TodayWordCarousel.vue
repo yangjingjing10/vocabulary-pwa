@@ -18,9 +18,10 @@ const props = withDefaults(
   },
 )
 
-const AUTO_INTERVAL_MS = 3600
+const AUTO_INTERVAL_MS = 4800
 /** 小于该位移视为点按（手机轻微抖动也算点按） */
 const TAP_THRESHOLD = 18
+const SLIDE_MS = 560
 
 const words = ref<CarouselWord[]>([])
 const currentIndex = ref(0)
@@ -123,7 +124,7 @@ async function goTo(dir: 'next' | 'prev') {
 
   window.setTimeout(() => {
     isAnimating.value = false
-  }, 320)
+  }, SLIDE_MS)
 }
 
 function nextWord() {
@@ -340,9 +341,9 @@ defineExpose({
   text-align: center;
   pointer-events: none;
   transition:
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.32s ease,
-    filter 0.32s ease;
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.55s ease,
+    filter 0.55s ease;
   will-change: transform, opacity;
 }
 
@@ -369,17 +370,17 @@ defineExpose({
 
 .word-strip__word {
   max-width: 100%;
-  font-size: clamp(32px, 8vw, 50px);
+  font-size: clamp(28px, 7vw, 42px);
   font-weight: 800;
   letter-spacing: -1px;
   line-height: 1.1;
   word-break: break-word;
   color: var(--app-font-color-muted, #64748b);
-  transition: color 0.32s ease, font-size 0.32s ease;
+  transition: color 0.55s ease, font-size 0.55s ease;
 }
 
 .word-strip__item.is-center .word-strip__word {
-  font-size: clamp(52px, 13vw, 78px);
+  font-size: clamp(44px, 11vw, 64px);
   color: var(--app-font-color, #0f172a);
 }
 
@@ -430,8 +431,8 @@ defineExpose({
 .word-slide-enter-active,
 .word-slide-leave-active {
   transition:
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.32s ease;
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.55s ease;
 }
 
 .is-dir-next .word-slide-enter-from {

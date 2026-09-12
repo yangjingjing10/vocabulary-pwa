@@ -294,9 +294,8 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   gap: 10px;
   min-height: 56px;
   padding: 8px 12px 8px 16px;
-  background: rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+  background: transparent;
+  border-bottom: 1px solid transparent;
 }
 
 .choice-record-page__back {
@@ -306,14 +305,15 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   height: 36px;
   border: 0;
   border-radius: 999px;
-  background: #f1f5f9;
+  background: transparent;
   color: var(--app-font-color-muted, #475569);
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .choice-record-page__back:hover {
-  background: #e2e8f0;
+  background: transparent;
+  color: var(--app-font-color, #0f172a);
 }
 
 .choice-record-page__title {
@@ -421,18 +421,18 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   width: 100%;
   margin-bottom: 10px;
   padding: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(10px);
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.38);
   color: var(--app-font-color-muted, #475569);
   cursor: pointer;
   text-align: left;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
 }
 
 .choice-record-page__batch:hover {
-  background: rgba(255, 255, 255, 0.58);
-  border-color: var(--app-font-color-soft, #94a3b8);
+  background: rgba(255, 255, 255, 0.48);
+  border-color: rgba(148, 163, 184, 0.5);
 }
 
 .choice-record-page__batch-main {
@@ -461,22 +461,22 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
 }
 
 .choice-record-page__batch-score--gold {
-  background: rgba(254, 243, 199, 0.75);
+  background: rgba(254, 243, 199, 0.45);
   color: #b45309;
 }
 
 .choice-record-page__batch-score--blue {
-  background: rgba(226, 232, 240, 0.8);
+  background: rgba(226, 232, 240, 0.45);
   color: var(--app-font-color, #334155);
 }
 
 .choice-record-page__batch-score--green {
-  background: rgba(220, 252, 231, 0.75);
+  background: rgba(220, 252, 231, 0.45);
   color: #15803d;
 }
 
 .choice-record-page__batch-score--orange {
-  background: rgba(255, 237, 213, 0.75);
+  background: rgba(255, 237, 213, 0.45);
   color: #c2410c;
 }
 
@@ -486,10 +486,10 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   gap: 14px;
   margin-bottom: 20px;
   padding: 20px 16px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.38);
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
 }
 
 .choice-record-page__accuracy {
@@ -524,7 +524,8 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   gap: 4px;
   padding: 12px 8px;
   border-radius: 12px;
-  background: rgba(248, 250, 252, 0.55);
+  background: transparent;
+  border: 1px dashed rgba(148, 163, 184, 0.3);
 }
 
 .choice-record-page__stat strong {
@@ -552,19 +553,18 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   width: 100%;
   margin-bottom: 10px;
   padding: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(10px);
-  box-shadow: none;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.38);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
   text-align: left;
   cursor: pointer;
 }
 
 .choice-q-card.is-wrong {
-  box-shadow: none;
-  border-color: rgba(220, 38, 38, 0.28);
-  background: rgba(254, 242, 242, 0.45);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+  border-color: rgba(220, 38, 38, 0.35);
+  background: rgba(254, 242, 242, 0.42);
 }
 
 .choice-q-card__row {
@@ -633,8 +633,8 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   margin: 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(255, 251, 235, 0.65);
-  border: 1px solid rgba(253, 230, 138, 0.7);
+  background: rgba(255, 251, 235, 0.45);
+  border: 1px dashed rgba(253, 230, 138, 0.7);
   font-size: 12px;
   line-height: 1.45;
   color: #92400e;
@@ -646,26 +646,29 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   gap: 10px;
   padding: 8px 10px;
   border-radius: 10px;
-  background: rgba(248, 250, 252, 0.5);
-  border: 1px solid transparent;
+  background: transparent;
+  border: 1px dashed rgba(148, 163, 184, 0.28);
   font-size: 13px;
   color: var(--app-font-color-muted, #475569);
 }
 
 .choice-q-card__option.is-user {
-  background: rgba(240, 253, 244, 0.6);
-  border-color: rgba(187, 247, 208, 0.8);
+  background: rgba(240, 253, 244, 0.45);
+  border-style: solid;
+  border-color: rgba(187, 247, 208, 0.7);
 }
 
 .choice-q-card__option.is-correct {
-  background: rgba(240, 253, 244, 0.6);
-  border-color: rgba(187, 247, 208, 0.8);
+  background: rgba(240, 253, 244, 0.45);
+  border-style: solid;
+  border-color: rgba(187, 247, 208, 0.7);
   color: #166534;
 }
 
 .choice-q-card__option.is-wrong-pick {
-  background: rgba(254, 242, 242, 0.6);
-  border-color: rgba(254, 202, 202, 0.8);
+  background: rgba(254, 242, 242, 0.45);
+  border-style: solid;
+  border-color: rgba(254, 202, 202, 0.7);
   color: #b91c1c;
 }
 
@@ -676,7 +679,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: #e2e8f0;
+  background: rgba(226, 232, 240, 0.65);
   font-size: 11px;
   font-weight: 700;
   color: var(--app-font-color-muted, #64748b);
@@ -735,7 +738,8 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   margin: 10px 0 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(248, 250, 252, 0.5);
+  background: transparent;
+  border: 1px dashed rgba(148, 163, 184, 0.3);
   font-size: 12px;
   line-height: 1.5;
   color: var(--app-font-color-muted, #64748b);

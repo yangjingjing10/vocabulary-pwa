@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dark Mode Word Quiz Pro</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #121214; /* 高级深空灰 */
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: #ffffff;
+        }
+
+        /* ================= 顶部导航栏 ================= */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 40px 24px 0;
+            z-index: 50;
+        }
+
+        /* 返回按钮 */
+        .back-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            color: #ffffff;
+            transition: all 0.3s ease;
+        }
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateX(-2px);
+        }
+
+        /* 暂停按钮 */
+        .pause-btn {
+            height: 40px;
+            padding: 0 16px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .pause-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        .pause-btn.paused {
+            background: rgba(255, 69, 58, 0.15);
+            border-color: rgba(255, 69, 58, 0.3);
+            color: #ff453a;
+        }
+
+        /* ================= 中间单词舞台 ================= */
+        .scene {
+            flex: 1;
+            width: 100%;
+            perspective: 1000px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: -40px; /* 稍微往上提，给下方例句留空间 */
+        }
+
+        .carousel {
+            width: 300px;
+            height: 200px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .word-item {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+            transform-origin: center center;
+            pointer-events: none;
+        }
+
+        .word {
+            font-size: 72px;
+            font-weight: 800;
+            letter-spacing: -2px;
+            color: #ffffff;
+            transition: color 0.6s ease, text-shadow 0.6s ease;
+        }
+        
+        .phonetic {
+            font-size: 16px;
+            color: #636366;
+            margin-top: 8px;
+            transition: opacity 0.6s ease;
+        }
+
+        /* ================= 例句折叠面板 ================= */
+        .example-panel {
+            position: absolute;
+            bottom: 140px; /* 位于输入框上方 */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 380px;
+            z-index: 40;
+            transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .example-header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #636366;
+            cursor: pointer;
+            padding: 8px 0;
+            transition: color 0.3s ease;
+        }
+        .example-header:hover {
+            color: #a1a1a6;
+        }
+        .example-header svg {
+            transition: transform 0.4s ease;
+        }
+        .example-panel.open .example-header svg {
+            transform: rotate(180deg);
+        }
+
+        .example-content {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+            background: rgba(30, 30, 32, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .example-panel.open .example-content {
+            max-height: 200px;
+            opacity: 1;
+            padding: 16px;
+            margin-top: 8px;
+        }
+
+        .example-item {
+            font-size: 14px;
+            color: #a1a1a6;
+            line-height: 1.5;
+            margin-bottom: 12px;
+            padding-left: 12px;
+            border-left: 2px solid #0a84ff; /* 电光蓝高亮 */
+        }
+        .example-item:last-child {
+            margin-bottom: 0;
+        }
+        .example-item span {
+            color: #ffffff; /* 高亮单词本身 */
+            font-weight: 600;
+        }
+
+        /* ================= 底部输入区域 ================= */
+        .input-panel {
+            padding: 0 24px 40px 24px;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+            z-index: 20;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .input-wrapper {
+            position: relative;
+            border-radius: 20px;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .input-wrapper input {
+            width: 100%;
+            height: 64px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 0 20px;
+            font-size: 17px;
+            color: #ffffff;
+            outline: none;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .input-wrapper input::placeholder {
+            color: #48484a;
+            font-weight: 400;
+        }
+
+        .input-wrapper input:focus {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: #0a84ff; /* 苹果电光蓝 */
+            box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        /* 错误状态 */
+        .input-wrapper.error {
+            animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+        }
+        .input-wrapper.error input {
+            border-color: #ff453a;
+            box-shadow: 0 0 0 4px rgba(255, 69, 58, 0.3), 0 0 20px rgba(255, 69, 58, 0.2);
+        }
+
+        /* 正确状态 */
+        .input-wrapper.success input {
+            border-color: #30d158; /* 苹果荧光绿 */
+            box-shadow: 0 0 0 4px rgba(48, 209, 88, 0.3), 0 0 30px rgba(48, 209, 88, 0.2);
+        }
+        .input-wrapper.success {
+            animation: bounce 0.4s cubic-bezier(0.25, 1, 0.5, 1) both;
+        }
+
+        /* 暂停状态下的输入框 */
+        .input-wrapper.disabled {
+            opacity: 0.3;
+            pointer-events: none;
+            filter: grayscale(1);
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-8px, 0, 0); }
+            40%, 60% { transform: translate3d(8px, 0, 0); }
+        }
+
+        @keyframes bounce {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0); }
+        }
+
+        /* 粒子画布 */
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 30;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- 顶部导航栏 -->
+    <div class="top-bar">
+        <div class="back-btn" id="back-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M15 18l-6-6 6-6"/>
+            </svg>
+        </div>
+        <div class="pause-btn" id="pause-btn">
+            <svg id="pause-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16"></rect>
+                <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+            <span id="pause-text">暂停</span>
+        </div>
+    </div>
+
+    <!-- 中间单词舞台 -->
+    <div class="scene" id="scene">
+        <div class="carousel" id="carousel">
+            <!-- 内容由 JS 生成 -->
+        </div>
+    </div>
+
+    <!-- 例句折叠面板 -->
+    <div class="example-panel" id="example-panel">
+        <div class="example-header" id="example-header">
+            <span>查看例句语境 (1条)</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+        </div>
+        <div class="example-content" id="example-content">
+            <!-- 例句内容由 JS 动态填充 -->
+        </div>
+    </div>
+
+    <!-- 底部输入区域 -->
+    <div class="input-panel">
+        <div class="input-wrapper" id="input-wrapper">
+            <input type="text" id="answer-input" placeholder="请输入中文释义，按回车确认" autocomplete="off">
+        </div>
+    </div>
+
+    <!-- 粒子特效画布 -->
+    <canvas id="particle-canvas"></canvas>
+
+    <script>
+        // 数据源：增加了例句
+        const words = [
+            { word: "jungle", phonetic: "/ˈdʒʌŋɡl/", meaning: "丛林", example: "The <span>jungle</span> was dense and full of life." },
+            { word: "apple", phonetic: "/ˈæpl/", meaning: "苹果", example: "She ate a red <span>apple</span> for breakfast." },
+            { word: "safari", phonetic: "/səˈfɑːri/", meaning: "狩猎旅行", example: "We went on a <span>safari</span> in Africa last summer." },
+            { word: "elephant", phonetic: "/ˈelɪfənt/", meaning: "大象", example: "The <span>elephant</span> is the largest land animal." },
+            { word: "mountain", phonetic: "/ˈmaʊntn/", meaning: "山脉", example: "They climbed to the top of the <span>mountain</span>." },
+            { word: "river", phonetic: "/ˈrɪvər/", meaning: "河流", example: "The <span>river</span> flows gently through the valley." },
+            { word: "forest", phonetic: "/ˈfɒrɪst/", meaning: "森林", example: "We got lost in the dark <span>forest</span>." }
+        ];
+
+        const carousel = document.getElementById('carousel');
+        const inputWrapper = document.getElementById('input-wrapper');
+        const input = document.getElementById('answer-input');
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        const examplePanel = document.getElementById('example-panel');
+        const exampleContent = document.getElementById('example-content');
+        const pauseBtn = document.getElementById('pause-btn');
+
+        const cardCount = words.length;
+        const angle = 360 / cardCount; 
+        const radius = 280; 
+
+        let currentIndex = 0;
+        let isAnimating = false;
+        let currentRotation = 0;
+        let particles = [];
+        let isPaused = false;
+
+        // 初始化 Canvas
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 初始化 3D 单词
+        function initCards() {
+            carousel.innerHTML = '';
+            words.forEach((item, index) => {
+                const el = document.createElement('div');
+                el.className = 'word-item';
+                el.innerHTML = `
+                    <div class="word">${item.word}</div>
+                    <div class="phonetic">${item.phonetic}</div>
+                `;
+                
+                const cardAngle = angle * index;
+                el.style.transform = `rotateY(${cardAngle}deg) translateZ(${radius}px)`;
+                el.dataset.index = index;
+                
+                carousel.appendChild(el);
+            });
+            updateCards();
+            updateExample(); // 初始化例句
+        }
+
+        // 更新卡片状态
+        function updateCards() {
+            const items = document.querySelectorAll('.word-item');
+            items.forEach((el, index) => {
+                let diff = index - currentIndex;
+                if (diff > cardCount / 2) diff -= cardCount;
+                if (diff < -cardCount / 2) diff += cardCount;
+
+                const wordEl = el.querySelector('.word');
+
+                if (diff === 0) {
+                    el.style.transform = `rotateY(${angle * index}deg) translateZ(${radius + 30}px) scale(1.15)`;
+                    el.style.zIndex = 10;
+                    el.style.opacity = 1;
+                    el.style.filter = 'blur(0px)';
+                    wordEl.style.color = '#ffffff';
+                    wordEl.style.textShadow = '0 0 30px rgba(255,255,255,0.1)';
+                } else if (Math.abs(diff) === 1) {
+                    el.style.transform = `rotateY(${angle * index}deg) translateZ(${radius}px) scale(0.85)`;
+                    el.style.zIndex = 5;
+                    el.style.opacity = 0.2;
+                    el.style.filter = 'blur(2px)';
+                    wordEl.style.color = '#636366';
+                    wordEl.style.textShadow = 'none';
+                } else {
+                    el.style.transform = `rotateY(${angle * index}deg) translateZ(${radius - 50}px) scale(0.6)`;
+                    el.style.zIndex = 1;
+                    el.style.opacity = 0.05;
+                    el.style.filter = 'blur(4px)';
+                    wordEl.style.color = '#636366';
+                    wordEl.style.textShadow = 'none';
+                }
+            });
+        }
+
+        // 更新例句内容
+        function updateExample() {
+            const currentWord = words[currentIndex];
+            exampleContent.innerHTML = `<div class="example-item">${currentWord.example}</div>`;
+        }
+
+        // 切换到下一个
+        function rotateToIndex(index) {
+            if (isPaused) return;
+            currentIndex = index;
+            currentRotation = -angle * currentIndex;
+            carousel.style.transform = `translateZ(-${radius}px) rotateY(${currentRotation}deg)`;
+            setTimeout(() => {
+                updateCards();
+                updateExample();
+            }, 100);
+            input.value = ''; 
+            // 切换时自动收起例句
+            examplePanel.classList.remove('open');
+        }
+
+        // ================= 粒子特效 =================
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 10;
+                this.vy = (Math.random() - 0.5) * 10;
+                this.size = Math.random() * 4 + 2;
+                this.color = color;
+                this.life = 1;
+                this.decay = Math.random() * 0.02 + 0.015;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.1;
+                this.life -= this.decay;
+            }
+            draw() {
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function createExplosion(x, y) {
+            const color = '#30d158';
+            for (let i = 0; i < 60; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        // ================= 交互逻辑 =================
+
+        // 提交答案
+        function submitAnswer() {
+            if (isAnimating || isPaused) return;
+            const answer = input.value.trim();
+            if (!answer) return;
+
+            const currentWord = words[currentIndex];
+            const isCorrect = answer.toLowerCase() === currentWord.meaning.toLowerCase() || 
+                              currentWord.meaning.includes(answer) ||
+                              answer.includes(currentWord.meaning);
+
+            if (isCorrect) {
+                inputWrapper.classList.add('success');
+                const rect = inputWrapper.getBoundingClientRect();
+                createExplosion(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                if (navigator.vibrate) navigator.vibrate(30);
+
+                setTimeout(() => {
+                    inputWrapper.classList.remove('success');
+                    rotateToIndex((currentIndex + 1) % cardCount);
+                }, 800);
+            } else {
+                inputWrapper.classList.add('error');
+                if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+                setTimeout(() => inputWrapper.classList.remove('error'), 500);
+            }
+        }
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submitAnswer();
+        });
+
+        // 返回按钮
+        document.getElementById('back-btn').addEventListener('click', () => {
+            // 这里触发你的返回逻辑，比如 history.back()
+            alert("返回上一页");
+        });
+
+        // 暂停按钮
+        pauseBtn.addEventListener('click', () => {
+            isPaused = !isPaused;
+            if (isPaused) {
+                pauseBtn.classList.add('paused');
+                document.getElementById('pause-text').innerText = '继续';
+                inputWrapper.classList.add('disabled');
+                // 切换为播放图标
+                document.getElementById('pause-icon').innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+            } else {
+                pauseBtn.classList.remove('paused');
+                document.getElementById('pause-text').innerText = '暂停';
+                inputWrapper.classList.remove('disabled');
+                // 切换为暂停图标
+                document.getElementById('pause-icon').innerHTML = '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>';
+            }
+        });
+
+        // 展开/收起例句
+        document.getElementById('example-header').addEventListener('click', () => {
+            examplePanel.classList.toggle('open');
+        });
+
+        // 点击舞台切换（防误触逻辑）
+        document.getElementById('scene').addEventListener('click', (e) => {
+            if (e.target.closest('.input-panel') || e.target.closest('.example-panel')) return;
+            if (isAnimating || isPaused) return;
+            
+            // 如果例句是展开的，点击空白处先收起例句
+            if (examplePanel.classList.contains('open')) {
+                examplePanel.classList.remove('open');
+                return;
+            }
+
+            // 如果输入框有内容，不切换
+            if (input.value.trim() !== '') {
+                inputWrapper.style.animation = 'shake 0.4s';
+                setTimeout(() => inputWrapper.style.animation = '', 400);
+                return;
+            }
+
+            rotateToIndex((currentIndex + 1) % cardCount);
+        });
+
+        // 初始化
+        initCards();
+        carousel.style.transform = `translateZ(-${radius}px) rotateY(0deg)`;
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apple Style Word Timeline</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #fbfbfd; /* 苹果官网常用的极浅灰白色 */
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: #1d1d1f;
+        }
+
+        /* 顶部状态栏 */
+        .header {
+            position: absolute;
+            top: 40px;
+            width: 100%;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: #86868b;
+            letter-spacing: 1px;
+            z-index: 10;
+        }
+
+        /* ================= 核心舞台 ================= */
+        .timeline-scene {
+            position: relative;
+            flex: 1;
+            width: 100%;
+            overflow: hidden;
+            cursor: grab;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .timeline-scene:active {
+            cursor: grabbing;
+        }
+
+        /* 1. 极光背景层（移动最慢，产生深度） */
+        .aurora-bg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 600px;
+            height: 600px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.6;
+            transition: background 0.8s ease, transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* 2. 滑动轨道（包含所有单词） */
+        .track {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            /* 核心：苹果式平滑缓动 */
+            transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 1;
+        }
+
+        /* 3. 单个单词节点（全屏一页） */
+        .word-node {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            /* 核心：让每个节点在滑动时拥有视差和呼吸感 */
+            transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1),
+                        opacity 0.8s cubic-bezier(0.25, 1, 0.5, 1),
+                        filter 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        /* 单词文字 */
+        .word {
+            font-size: 72px; /* 苹果官网式的大字号 */
+            font-weight: 700;
+            letter-spacing: -2px;
+            color: #1d1d1f;
+            transition: color 0.8s ease;
+            z-index: 2;
+        }
+        
+        /* 音标（视差速度稍慢，产生层次） */
+        .phonetic {
+            font-size: 18px;
+            color: #86868b;
+            margin-top: 12px;
+            transition: all 0.8s ease;
+            z-index: 2;
+        }
+
+        /* 底部提示 */
+        .tap-hint {
+            position: absolute;
+            bottom: 40px;
+            width: 100%;
+            text-align: center;
+            font-size: 12px;
+            color: #c7c7cc;
+            pointer-events: none;
+            animation: breath 2s infinite ease-in-out;
+            z-index: 10;
+        }
+
+        @keyframes breath {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+        }
+
+        /* 进度条 */
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 2px;
+            background: rgba(0,0,0,0.1);
+            width: 100%;
+            z-index: 10;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #0071e3; /* 苹果蓝 */
+            width: 0%;
+            transition: width 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+            border-radius: 0 2px 2px 0;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">Word Quiz</div>
+
+    <div class="timeline-scene" id="scene">
+        <!-- 流动的极光背景 -->
+        <div class="aurora-bg" id="aurora"></div>
+        
+        <!-- 滑动轨道 -->
+        <div class="track" id="track">
+            <!-- 内容由 JS 生成 -->
+        </div>
+    </div>
+
+    <div class="tap-hint">← 左右滑动切换 →</div>
+    
+    <div class="progress-bar">
+        <div class="progress-fill" id="progress"></div>
+    </div>
+
+    <script>
+        // 带有极光颜色的单词数据
+        const words = [
+            { word: "jungle", phonetic: "/ˈdʒʌŋɡl/", color1: "#a8edea", color2: "#fed6e3" },
+            { word: "apple", phonetic: "/ˈæpl/", color1: "#fbc2eb", color2: "#a6c1ee" },
+            { word: "safari", phonetic: "/səˈfɑːri/", color1: "#fdcbf1", color2: "#e6dee9" },
+            { word: "elephant", phonetic: "/ˈelɪfənt/", color1: "#a1c4fd", color2: "#c2e9fb" },
+            { word: "mountain", phonetic: "/ˈmaʊntn/", color1: "#d4fc79", color2: "#96e6a1" },
+            { word: "river", phonetic: "/ˈrɪvər/", color1: "#84fab0", color2: "#8fd3f4" },
+            { word: "forest", phonetic: "/ˈfɒrɪst/", color1: "#cfd9df", color2: "#e2ebf0" }
+        ];
+
+        const scene = document.getElementById('scene');
+        const track = document.getElementById('track');
+        const aurora = document.getElementById('aurora');
+        const progress = document.getElementById('progress');
+        const cardCount = words.length;
+
+        let currentIndex = 0;
+        let isDragging = false;
+        let startX = 0;
+        let currentTranslateX = 0;
+        let prevTranslateX = 0;
+
+        // 初始化
+        function init() {
+            track.innerHTML = '';
+            words.forEach((item, index) => {
+                const el = document.createElement('div');
+                el.className = 'word-node';
+                el.innerHTML = `
+                    <div class="word">${item.word}</div>
+                    <div class="phonetic">${item.phonetic}</div>
+                `;
+                el.dataset.index = index;
+                track.appendChild(el);
+            });
+
+            // 将轨道初始位置对齐到第一个单词
+            updatePosition(0);
+            updateVisuals(0);
+        }
+
+        // 更新轨道的物理位置（平滑移动）
+        function updatePosition(index) {
+            // 每次移动一个屏幕的宽度
+            const translateX = -index * window.innerWidth;
+            track.style.transform = `translate(calc(-50% + ${translateX}px), -50%)`;
+            
+            // 更新进度条
+            progress.style.width = `${((index + 1) / cardCount) * 100}%`;
+        }
+
+        // 更新视觉状态（极光颜色、单词透明度、视差效果）
+        function updateVisuals(index) {
+            const nodes = document.querySelectorAll('.word-node');
+            
+            // 1. 更新极光背景颜色（流动效果）
+            const currentData = words[index];
+            aurora.style.background = `radial-gradient(circle, ${currentData.color1}, ${currentData.color2})`;
+            // 极光背景缓慢移动（视差效果：移动速度比单词慢）
+            aurora.style.transform = `translate(calc(-50% + ${-index * 30}px), -50%) scale(${1 + index * 0.05})`;
+
+            // 2. 更新每个节点的视觉状态
+            nodes.forEach((node, i) => {
+                const diff = i - index; // 距离中心的偏移量
+
+                if (diff === 0) {
+                    // 正中间的单词
+                    node.style.opacity = 1;
+                    node.style.filter = 'blur(0px)';
+                    node.querySelector('.word').style.transform = 'translateX(0px)';
+                    node.querySelector('.phonetic').style.transform = 'translateX(0px)';
+                    node.querySelector('.word').style.color = '#1d1d1f';
+                } else {
+                    // 两侧的单词：淡出、模糊、产生视差位移
+                    node.style.opacity = 0.15;
+                    node.style.filter = 'blur(4px)';
+                    
+                    // 核心视差逻辑：文字移动快，音标移动慢
+                    // 这样在滑动时，文字和音标会产生错位，产生极强的空间感
+                    const parallaxWord = diff * -60; // 文字反向位移
+                    const parallaxPhonetic = diff * -20; // 音标反向位移（幅度小）
+                    
+                    node.querySelector('.word').style.transform = `translateX(${parallaxWord}px)`;
+                    node.querySelector('.phonetic').style.transform = `translateX(${parallaxPhonetic}px)`;
+                }
+            });
+        }
+
+        // 动画结束后的清理与吸附
+        function snapToIndex(index) {
+            if (index < 0) index = 0;
+            if (index >= cardCount) index = cardCount - 1;
+            
+            currentIndex = index;
+            updatePosition(currentIndex);
+            updateVisuals(currentIndex);
+        }
+
+        // ================= 交互逻辑 =================
+
+        // 1. 鼠标/触摸按下
+        function dragStart(e) {
+            isDragging = true;
+            startX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            prevTranslateX = -currentIndex * window.innerWidth;
+            track.style.transition = 'none'; // 拖动时取消过渡，跟手
+            aurora.style.transition = 'none';
+        }
+
+        // 2. 鼠标/触摸移动
+        function dragMove(e) {
+            if (!isDragging) return;
+            const currentX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            const deltaX = currentX - startX;
+            
+            // 计算拖动偏移
+            const currentTranslate = prevTranslateX + deltaX;
+            
+            // 实时更新轨道位置（跟手）
+            track.style.transform = `translate(calc(-50% + ${currentTranslate}px), -50%)`;
+            
+            // 实时更新极光（视差：极光移动距离是单词的 0.3 倍）
+            aurora.style.transform = `translate(calc(-50% + ${currentTranslate * 0.3}px), -50%)`;
+        }
+
+        // 3. 鼠标/触摸松开
+        function dragEnd(e) {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            // 恢复过渡动画
+            track.style.transition = 'transform 0.8s cubic-bezier(0.25, 1, 0.5, 1)';
+            aurora.style.transition = 'transform 1.2s cubic-bezier(0.25, 1, 0.5, 1), background 0.8s ease';
+
+            const endX = e.type.includes('mouse') ? e.clientX : e.changedTouches[0].clientX;
+            const deltaX = endX - startX;
+            
+            // 判定阈值：滑动超过 50px 或者快速轻扫，就切换
+            if (deltaX < -50) {
+                snapToIndex(currentIndex + 1); // 向左滑，看下一个
+            } else if (deltaX > 50) {
+                snapToIndex(currentIndex - 1); // 向右滑，看上一个
+            } else {
+                snapToIndex(currentIndex); // 距离不够，弹回原位
+            }
+        }
+
+        // 点击屏幕也可以切换（保留之前的便捷性）
+        scene.addEventListener('click', (e) => {
+            // 如果刚刚拖动过，就不触发点击
+            if (Math.abs(e.clientX - startX) > 10) return;
+            
+            // 点击右边看下一个，点击左边看上一个
+            if (e.clientX > window.innerWidth / 2) {
+                snapToIndex(currentIndex + 1);
+            } else {
+                snapToIndex(currentIndex - 1);
+            }
+        });
+
+        // 绑定事件
+        scene.addEventListener('mousedown', dragStart);
+        window.addEventListener('mousemove', dragMove);
+        window.addEventListener('mouseup', dragEnd);
+
+        scene.addEventListener('touchstart', dragStart, { passive: true });
+        window.addEventListener('touchmove', dragMove, { passive: true });
+        window.addEventListener('touchend', dragEnd);
+
+        // 窗口大小改变时重新计算
+        window.addEventListener('resize', () => {
+            snapToIndex(currentIndex);
+        });
+
+        // 启动！
+        init();
+    </script>
+</body>
+</html>

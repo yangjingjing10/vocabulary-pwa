@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus Word Quiz</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f7f7f9; /* 保持高级的浅灰底 */
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: #1c1c1e;
+        }
+
+        /* 顶部状态栏 */
+        .header {
+            position: absolute;
+            top: 40px;
+            width: 100%;
+            text-align: center;
+            font-size: 16px;
+            font-weight: 600;
+            color: #a1a1a6;
+            letter-spacing: 2px;
+            z-index: 10;
+        }
+
+        /* 3D 舞台，占据整个屏幕 */
+        .scene {
+            width: 100%;
+            height: 100vh;
+            perspective: 1000px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer; /* 提示用户可以点击 */
+        }
+
+        .carousel {
+            width: 300px;
+            height: 200px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .word-item {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+            transform-origin: center center;
+            pointer-events: none;
+        }
+
+        .word {
+            font-size: 56px;
+            font-weight: 700;
+            letter-spacing: -1px;
+            color: #1c1c1e;
+            transition: color 0.6s ease;
+        }
+        
+        .phonetic {
+            font-size: 16px;
+            color: #8e8e93;
+            margin-top: 8px;
+            transition: opacity 0.6s ease;
+        }
+
+        /* 点击屏幕时的呼吸提示（非常微弱，不干扰视觉） */
+        .tap-hint {
+            position: absolute;
+            bottom: 40px;
+            width: 100%;
+            text-align: center;
+            font-size: 13px;
+            color: #c7c7cc;
+            pointer-events: none;
+            animation: breath 2s infinite ease-in-out;
+        }
+
+        @keyframes breath {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">Word Quiz</div>
+
+    <div class="scene" id="scene">
+        <div class="carousel" id="carousel">
+            <!-- 内容由 JS 生成 -->
+        </div>
+    </div>
+    
+    <div class="tap-hint">点击任意处查看下一个</div>
+
+    <script>
+        const words = [
+            { word: "jungle", phonetic: "/ˈdʒʌŋɡl/" },
+            { word: "apple", phonetic: "/ˈæpl/" },
+            { word: "safari", phonetic: "/səˈfɑːri/" },
+            { word: "elephant", phonetic: "/ˈelɪfənt/" },
+            { word: "mountain", phonetic: "/ˈmaʊntn/" },
+            { word: "river", phonetic: "/ˈrɪvər/" },
+            { word: "forest", phonetic: "/ˈfɒrɪst/" }
+        ];
+
+        const carousel = document.getElementById('carousel');
+        const scene = document.getElementById('scene');
+        const cardCount = words.length;
+        const angle = 360 / cardCount; 
+        const radius = 280; 
+
+        let currentIndex = 0;
+        let isAnimating = false; // 防止快速点击导致动画错乱
+        let currentRotation = 0;
+
+        function initCards() {
+            carousel.innerHTML = '';
+            words.forEach((item, index) => {
+                const el = document.createElement('div');
+                el.className = 'word-item';
+                el.innerHTML = `
+                    <div class="word">${item.word}</div>
+                    <div class="phonetic">${item.phonetic}</div>
+                `;
+                
+                const cardAngle = angle * index;
+                el.style.transform = `rotateY(${cardAngle}deg) translateZ(${radius}px)`;
+                el.dataset.index = index;
+                
+                carousel.appendChild(el);
+            });
+            updateCards();
+        }
+
+        function updateCards() {
+            const items = document.querySelectorAll('.word-item');
+            items.forEach((el, index) => {
+                let diff = index - currentIndex;
+                if (diff > cardCount / 2) diff -= cardCount;
+                if (diff < -cardCount / 2) diff += cardCount;
+
+                const wordEl = el.querySelector('.word');
+
+                if (diff === 0) {
+                    el.style.transform = `rotateY(${angle * index}deg) translateZ(${radius + 30}px) scale(1.15)`;
+                    el.style.zIndex = 10;
+                    el.style.opacity = 1;
+                    el.style.filter = 'blur(0px)';
+                    wordEl.style.color = '#1c1c1e';
+                } else if (Math.abs(diff) === 1) {
+                    el.style.transform = `rotateY(${angle * index}deg) translateZ(${radius}px) scale(0.85)`;
+                    el.style.zIndex = 5;
+                    el.style.opacity = 0.4;
+                    el.style.filter = 'blur(1.5px)';
+                    wordEl.style.color = '#8e8e93';
+                } else {
+                    el.style.transform = `rotateY(${angle * index}deg) translateZ(${radius - 50}px) scale(0.6)`;
+                    el.style.zIndex = 1;
+                    el.style.opacity = 0.15;
+                    el.style.filter = 'blur(4px)';
+                    wordEl.style.color = '#8e8e93';
+                }
+            });
+        }
+
+        // 核心切换逻辑
+        function nextWord() {
+            if (isAnimating) return; // 如果正在动画中，忽略点击
+            isAnimating = true;
+
+            // 让当前中间的单词有一个轻微的“脉冲”反馈（缩放一下）
+            const currentEl = document.querySelector(`.word-item[data-index="${currentIndex}"]`);
+            if(currentEl) {
+                currentEl.style.transform = `rotateY(${angle * currentIndex}deg) translateZ(${radius + 30}px) scale(0.95)`;
+                setTimeout(() => {
+                    currentEl.style.transform = `rotateY(${angle * currentIndex}deg) translateZ(${radius + 30}px) scale(1.15)`;
+                }, 150);
+            }
+
+            // 延迟一点点，等脉冲反馈结束，再旋转到下一个
+            setTimeout(() => {
+                currentIndex = (currentIndex + 1) % cardCount; // 循环
+                currentRotation = -angle * currentIndex;
+                carousel.style.transform = `translateZ(-${radius}px) rotateY(${currentRotation}deg)`;
+                
+                setTimeout(() => {
+                    updateCards();
+                    isAnimating = false; // 动画结束，解锁
+                }, 100);
+            }, 150);
+        }
+
+        // 事件监听
+        // 1. 点击屏幕任意处
+        scene.addEventListener('click', nextWord);
+
+        // 2. 支持手机触屏滑动
+        let startX = 0;
+        let isDragging = false;
+
+        scene.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            isDragging = true;
+        }, { passive: true });
+
+        scene.addEventListener('touchend', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            const deltaX = e.changedTouches[0].clientX - startX;
+            
+            // 如果滑动距离超过 50px，或者只是单纯点击（距离很小），都触发下一个
+            // 如果你想让滑动和点击有区别，可以在这里做判断
+            nextWord();
+        });
+
+        // 3. 支持电脑鼠标滑动（可选，保留手感）
+        scene.addEventListener('mousedown', (e) => {
+            startX = e.clientX;
+            isDragging = true;
+        });
+
+        scene.addEventListener('mouseup', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            const deltaX = e.clientX - startX;
+            // 鼠标滑动或者点击，都触发下一个
+            nextWord();
+        });
+
+        // 初始化
+        initCards();
+        carousel.style.transform = `translateZ(-${radius}px) rotateY(0deg)`;
+    </script>
+</body>
+</html>

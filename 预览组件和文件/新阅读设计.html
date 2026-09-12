@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inline Bubble Translation</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #ffffff;
+            color: #1d1d1f;
+            line-height: 1.8;
+            -webkit-font-smoothing: antialiased;
+            padding-bottom: 100px;
+        }
+
+        /* 顶部导航栏 */
+        .top-nav {
+            position: sticky;
+            top: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 100;
+            border-bottom: 1px solid rgba(0,0,0,0.04);
+        }
+        .top-nav .title { font-size: 16px; font-weight: 600; }
+        .nav-actions { display: flex; gap: 12px; }
+        .icon-btn {
+            width: 34px; height: 34px; border-radius: 50%; background: transparent;
+            border: 1px solid #e5e5ea; display: flex; justify-content: center;
+            align-items: center; color: #1d1d1f; cursor: pointer; transition: all 0.2s;
+        }
+        .icon-btn:hover { background: #f5f5f7; }
+
+        /* 沉浸式文章区域 */
+        .article-container {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .article-title {
+            font-size: 28px; font-weight: 700; margin-bottom: 40px;
+            letter-spacing: -0.5px; color: #1d1d1f;
+        }
+
+        .paragraph-wrapper {
+            position: relative;
+            margin-bottom: 40px;
+        }
+
+        .paragraph-text {
+            font-size: 19px; color: #1d1d1f; letter-spacing: 0.1px;
+        }
+
+        .highlight-word {
+            background: rgba(255, 204, 0, 0.2); border-radius: 4px; padding: 0 2px;
+            font-weight: 500; cursor: pointer; transition: background 0.2s;
+        }
+        .highlight-word:hover { background: rgba(255, 204, 0, 0.4); }
+
+        /* 行内翻译小箭头 */
+        .inline-toggle {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 20px; height: 20px; margin-left: 4px; vertical-align: middle;
+            color: #d1d1d6; cursor: pointer; border: none; background: transparent;
+            border-radius: 50%; transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            position: relative; top: -2px;
+        }
+        .paragraph-wrapper:hover .inline-toggle { color: #0a84ff; background: rgba(10, 132, 255, 0.1); }
+        .paragraph-wrapper.expanded .inline-toggle { transform: rotate(180deg); color: #0a84ff; background: rgba(10, 132, 255, 0.1); }
+
+        /* ================= 翻译内联编辑区（气泡） ================= */
+        .translation-area {
+            max-height: 0; opacity: 0; overflow: hidden;
+            transition: max-height 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease, margin-top 0.4s ease;
+            margin-top: 0;
+        }
+
+        .paragraph-wrapper.expanded .translation-area {
+            max-height: 500px; /* 给足够大的空间让气泡自由伸展 */
+            opacity: 1; margin-top: 16px;
+        }
+
+        /* 气泡输入区核心样式 */
+        .bubble-input-wrapper {
+            position: relative;
+            background: #fafafa;
+            border-radius: 16px; /* 气泡感 */
+            padding: 14px 18px;
+            border: 1px solid rgba(0,0,0,0.03);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .bubble-input-wrapper:focus-within {
+            background: #ffffff;
+            border-color: rgba(10, 132, 255, 0.3);
+            box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.08), 0 4px 12px rgba(10, 132, 255, 0.05);
+        }
+
+        /* 使用 contenteditable 实现高度自适应 */
+        .bubble-input {
+            flex: 1;
+            font-size: 16px;
+            color: #1d1d1f;
+            line-height: 1.6;
+            font-family: inherit;
+            outline: none;
+            word-break: break-word;
+            min-height: 24px; /* 最小高度，保证空的时候也有占位 */
+            max-height: 200px; /* 防止无限撑大页面 */
+            overflow-y: auto;
+        }
+
+        /* 自定义滚动条 */
+        .bubble-input::-webkit-scrollbar { width: 4px; }
+        .bubble-input::-webkit-scrollbar-thumb { background: #d1d1d6; border-radius: 4px; }
+
+        /* 占位符（当输入为空时显示） */
+        .bubble-input:empty::before {
+            content: attr(data-placeholder);
+            color: #c7c7cc;
+            pointer-events: none;
+        }
+
+        /* 回车提示小标识 */
+        .enter-hint {
+            font-size: 11px;
+            color: #c7c7cc;
+            margin-left: 12px;
+            align-self: flex-end;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .bubble-input-wrapper:focus-within .enter-hint {
+            opacity: 1;
+        }
+
+        /* 保存后的翻译展示 */
+        .saved-translation {
+            display: none;
+            font-size: 16px;
+            color: #86868b;
+            font-style: italic;
+            line-height: 1.6;
+            border-left: 2px solid #e5e5ea;
+            padding-left: 12px;
+            margin-top: 8px;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .paragraph-wrapper.saved .saved-translation { display: block; }
+        .paragraph-wrapper.saved .translation-area { display: none; } /* 保存后隐藏输入区 */
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="top-nav">
+        <div class="title">Read Article</div>
+        <div class="nav-actions">
+            <button class="icon-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            </button>
+            <button class="icon-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="article-container">
+        <div class="article-title">测试文章 1 - Garden Visit</div>
+
+        <!-- 段落 1 -->
+        <div class="paragraph-wrapper" id="para-1">
+            <div class="paragraph-text">
+                Yesterday, I visited a beautiful garden near my <span class="highlight-word">house</span>. There were many colorful <span class="highlight-word">flowers</span> blooming everywhere. I saw an <span class="highlight-word">apple</span> tree and a <span class="highlight-word">banana</span> tree in the corner.<!-- 
+                 --><button class="inline-toggle" onclick="toggleTranslation('para-1')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+            </div>
+
+            <div class="translation-area">
+                <div class="bubble-input-wrapper">
+                    <div class="bubble-input" 
+                         contenteditable="true" 
+                         data-placeholder="在此输入你的翻译，按 Enter 保存..."
+                         id="input-1"
+                         onkeydown="handleEnter(event, 'para-1')"></div>
+                    <div class="enter-hint">↵ Enter 保存</div>
+                </div>
+            </div>
+            <div class="saved-translation" id="saved-1"></div>
+        </div>
+
+        <!-- 段落 2 -->
+        <div class="paragraph-wrapper" id="para-2">
+            <div class="paragraph-text">
+                A small <span class="highlight-word">cat</span> was playing under the tree, and a friendly <span class="highlight-word">dog</span> was running around. The garden felt like a peaceful <span class="highlight-word">island</span> away from the busy city.<!-- 
+                 --><button class="inline-toggle" onclick="toggleTranslation('para-2')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+            </div>
+
+            <div class="translation-area">
+                <div class="bubble-input-wrapper">
+                    <div class="bubble-input" 
+                         contenteditable="true" 
+                         data-placeholder="在此输入你的翻译，按 Enter 保存..."
+                         id="input-2"
+                         onkeydown="handleEnter(event, 'para-2')"></div>
+                    <div class="enter-hint">↵ Enter 保存</div>
+                </div>
+            </div>
+            <div class="saved-translation" id="saved-2"></div>
+        </div>
+
+    </div>
+
+    <script>
+        // 切换展开/收起
+        function toggleTranslation(id) {
+            const para = document.getElementById(id);
+            const input = document.getElementById('input-' + id.split('-')[1]);
+            
+            if (para.classList.contains('saved')) {
+                // 如果已经保存了，重新进入编辑模式
+                para.classList.remove('saved');
+                para.classList.add('expanded');
+                input.innerText = document.getElementById('saved-' + id.split('-')[1]).innerText;
+                // 光标移到末尾
+                setTimeout(() => {
+                    input.focus();
+                    const range = document.createRange();
+                    const sel = window.getSelection();
+                    range.selectNodeContents(input);
+                    range.collapse(false);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }, 300);
+                return;
+            }
+            para.classList.toggle('expanded');
+            if (para.classList.contains('expanded')) {
+                setTimeout(() => input.focus(), 300); // 展开后自动聚焦
+            }
+        }
+
+        // 监听键盘事件
+        function handleEnter(event, id) {
+            // 如果按下了 Enter 且没有按住 Shift（允许 Shift+Enter 换行）
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault(); // 阻止默认换行
+                saveTranslation(id);
+            }
+            // 如果按 Esc 键，取消编辑
+            if (event.key === 'Escape') {
+                cancelTranslation(id);
+            }
+        }
+
+        // 保存翻译
+        function saveTranslation(id) {
+            const para = document.getElementById(id);
+            const input = document.getElementById('input-' + id.split('-')[1]);
+            const savedDiv = document.getElementById('saved-' + id.split('-')[1]);
+            
+            const text = input.innerText.trim();
+            if (!text) {
+                // 如果内容为空，直接收起即可
+                para.classList.remove('expanded');
+                return;
+            }
+
+            savedDiv.innerText = text;
+            para.classList.remove('expanded');
+            para.classList.add('saved');
+        }
+
+        function cancelTranslation(id) {
+            const para = document.getElementById(id);
+            para.classList.remove('expanded');
+        }
+    </script>
+</body>
+</html>

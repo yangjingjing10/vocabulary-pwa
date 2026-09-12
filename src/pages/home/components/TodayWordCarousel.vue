@@ -18,9 +18,8 @@ const props = withDefaults(
   },
 )
 
-const RADIUS = 300
-const AUTO_INTERVAL_MS = 3200
-const TAP_THRESHOLD = 28
+const AUTO_INTERVAL_MS = 3600
+const TAP_THRESHOLD = 36
 
 const words = ref<CarouselWord[]>([])
 const currentIndex = ref(0)
@@ -33,8 +32,6 @@ let dragStartX = 0
 let isDragging = false
 
 const cardCount = computed(() => words.value.length)
-const angleStep = computed(() => (cardCount.value > 0 ? 360 / cardCount.value : 0))
-const currentWord = computed(() => words.value[currentIndex.value] ?? null)
 
 const activeDate = computed(
   () => props.date || new Date().toISOString().split('T')[0],
@@ -42,9 +39,57 @@ const activeDate = computed(
 
 const isToday = computed(() => activeDate.value === new Date().toISOString().split('T')[0])
 
-const carouselTransform = computed(() => {
-  const rotation = -angleStep.value * currentIndex.value
-  return `translateZ(-${RADIUS}px) rotateY(${rotation}deg)`
+const currentWord = computed(() => words.value[currentIndex.value] ?? null)
+
+/** 只渲染可见的左 / 中 / 右三项，避免几十上百个 DOM */
+const visibleSlots = computed(() => {
+  const count = cardCount.value
+  if (count === 0) return []
+
+  const slots: Array<{
+    key: string
+    item: CarouselWord
+    index: number
+    position: 'left' | 'center' | 'right'
+  }> = []
+
+  const center = currentIndex.value
+  const left = (center - 1 + count) % count
+  const right = (center + 1) % count
+
+  if (count === 1) {
+    slots.push({
+      key: `${words.value[center].word}-c-${center}`,
+      item: words.value[center],
+      index: center,
+      position: 'center',
+    })
+    return slots
+  }
+
+  slots.push({
+    key: `${words.value[left].word}-l-${left}`,
+    item: words.value[left],
+    index: left,
+    position: 'left',
+  })
+  slots.push({
+    key: `${words.value[center].word}-c-${center}`,
+    item: words.value[center],
+    index: center,
+    position: 'center',
+  })
+
+  if (count > 2) {
+    slots.push({
+      key: `${words.value[right].word}-r-${right}`,
+      item: words.value[right],
+      index: right,
+      position: 'right',
+    })
+  }
+
+  return slots
 })
 
 const meaningText = computed(() => {
@@ -80,50 +125,6 @@ async function loadWords() {
   }
 }
 
-function getDiff(index: number) {
-  const count = cardCount.value
-  if (count === 0) return 0
-
-  let diff = index - currentIndex.value
-  if (diff > count / 2) diff -= count
-  if (diff < -count / 2) diff += count
-  return diff
-}
-
-function getItemStyle(index: number) {
-  const diff = getDiff(index)
-  const base = `rotateY(${angleStep.value * index}deg)`
-
-  if (diff === 0) {
-    return {
-      transform: `${base} translateZ(${RADIUS + 28}px) scale(1.12)`,
-      zIndex: 10,
-      opacity: 1,
-      filter: 'blur(0px)',
-    }
-  }
-
-  if (Math.abs(diff) === 1) {
-    return {
-      transform: `${base} translateZ(${RADIUS}px) scale(0.82)`,
-      zIndex: 5,
-      opacity: 0.38,
-      filter: 'blur(1.5px)',
-    }
-  }
-
-  return {
-    transform: `${base} translateZ(${RADIUS - 40}px) scale(0.58)`,
-    zIndex: 1,
-    opacity: 0.12,
-    filter: 'blur(3.5px)',
-  }
-}
-
-function isActive(index: number) {
-  return getDiff(index) === 0
-}
-
 function nextWord() {
   if (isAnimating.value || cardCount.value <= 1) return
   isAnimating.value = true
@@ -131,7 +132,7 @@ function nextWord() {
   currentIndex.value = (currentIndex.value + 1) % cardCount.value
   window.setTimeout(() => {
     isAnimating.value = false
-  }, 520)
+  }, 280)
 }
 
 function prevWord() {
@@ -141,7 +142,7 @@ function prevWord() {
   currentIndex.value = (currentIndex.value - 1 + cardCount.value) % cardCount.value
   window.setTimeout(() => {
     isAnimating.value = false
-  }, 520)
+  }, 280)
 }
 
 function toggleMeaning() {
@@ -177,6 +178,7 @@ function onPointerUp(clientX: number) {
   isDragging = false
   const deltaX = clientX - dragStartX
 
+  // 从右向左滑 = 下一个；从左向右滑 = 上一个
   if (Math.abs(deltaX) < TAP_THRESHOLD) {
     toggleMeaning()
   } else if (deltaX < 0) {
@@ -227,54 +229,56 @@ defineExpose({
 </script>
 
 <template>
-  <div class="today-word-carousel" aria-label="今日上传单词旋转木马">
-    <div v-if="isLoading" class="today-word-carousel__status">加载今日单词…</div>
+  <div class="word-strip" aria-label="当日单词滑动条">
+    <div v-if="isLoading" class="word-strip__status">加载单词…</div>
 
-    <div v-else-if="words.length === 0" class="today-word-carousel__status">
-      <p class="today-word-carousel__empty-title">{{ isToday ? '今日暂无单词' : '当日暂无单词' }}</p>
-      <p class="today-word-carousel__empty-hint">点击右上角 + 开始上传</p>
+    <div v-else-if="words.length === 0" class="word-strip__status">
+      <p class="word-strip__empty-title">{{ isToday ? '今日暂无单词' : '当日暂无单词' }}</p>
+      <p class="word-strip__empty-hint">去单词本导入后再回来看看</p>
     </div>
 
     <div
       v-else
-      class="today-word-carousel__scene"
+      class="word-strip__scene"
       @touchstart.passive="onTouchStart"
       @touchend="onTouchEnd"
       @mousedown="onMouseDown"
       @mouseup="onMouseUp"
     >
-      <div class="today-word-carousel__stage" :style="{ transform: carouselTransform }">
+      <div class="word-strip__track">
         <div
-          v-for="(item, index) in words"
-          :key="`${item.word}-${index}`"
-          class="today-word-carousel__item"
-          :class="{ 'is-active': isActive(index) }"
-          :style="getItemStyle(index)"
+          v-for="slot in visibleSlots"
+          :key="slot.key"
+          class="word-strip__item"
+          :class="`is-${slot.position}`"
         >
-          <div class="today-word-carousel__word">{{ item.word }}</div>
-          <div v-if="item.phonetic" class="today-word-carousel__phonetic">
-            {{ item.phonetic }}
+          <div class="word-strip__word">{{ slot.item.word }}</div>
+          <div
+            v-if="slot.position === 'center' && slot.item.phonetic"
+            class="word-strip__phonetic"
+          >
+            {{ slot.item.phonetic }}
           </div>
         </div>
       </div>
 
       <Transition name="meaning-fade">
-        <div v-if="showMeaning" class="today-word-carousel__meaning">
-          <p v-if="meaningText" class="today-word-carousel__meaning-text">{{ meaningText }}</p>
-          <p v-else class="today-word-carousel__meaning-empty">暂无释义</p>
+        <div v-if="showMeaning" class="word-strip__meaning">
+          <p v-if="meaningText" class="word-strip__meaning-text">{{ meaningText }}</p>
+          <p v-else class="word-strip__meaning-empty">暂无释义</p>
         </div>
       </Transition>
 
-      <p class="today-word-carousel__meta">{{ metaLabel }}</p>
+      <p class="word-strip__meta">{{ metaLabel }}</p>
     </div>
   </div>
 </template>
 
 <style scoped>
-.today-word-carousel {
+.word-strip {
   width: 100%;
   height: 100%;
-  min-height: 280px;
+  min-height: 240px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -282,118 +286,137 @@ defineExpose({
   -webkit-tap-highlight-color: transparent;
 }
 
-.today-word-carousel__status {
+.word-strip__status {
   width: 100%;
   text-align: center;
   color: var(--app-font-color-soft, #94a3b8);
 }
 
-.today-word-carousel__empty-title {
+.word-strip__empty-title {
   margin: 0 0 6px;
   font-size: 16px;
   font-weight: 650;
   color: var(--app-font-color-muted, #64748b);
 }
 
-.today-word-carousel__empty-hint {
+.word-strip__empty-hint {
   margin: 0;
   font-size: 13px;
 }
 
-.today-word-carousel__scene {
-  position: relative;
+.word-strip__scene {
   width: 100%;
-  padding: 8px 0 20px;
-  perspective: 1200px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  overflow: visible;
+  cursor: grab;
 }
 
-.today-word-carousel__stage {
-  width: min(360px, 88vw);
-  height: 200px;
+.word-strip__scene:active {
+  cursor: grabbing;
+}
+
+.word-strip__track {
   position: relative;
-  flex-shrink: 0;
-  transform-style: preserve-3d;
-  transition: transform 0.55s cubic-bezier(0.25, 1, 0.5, 1);
+  width: min(100%, 420px);
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.today-word-carousel__item {
+.word-strip__item {
   position: absolute;
-  inset: 0;
+  left: 50%;
+  top: 50%;
+  width: 42%;
+  max-width: 180px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  transform-origin: center center;
+  justify-content: center;
+  text-align: center;
   pointer-events: none;
-  transition: all 0.55s cubic-bezier(0.25, 1, 0.5, 1);
+  transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.28s ease,
+    filter 0.28s ease;
+  will-change: transform, opacity;
 }
 
-.today-word-carousel__word {
-  max-width: 94%;
-  padding: 0 8px;
-  font-size: clamp(44px, 11vw, 68px);
+.word-strip__item.is-left {
+  transform: translate(-132%, -50%) scale(0.72);
+  opacity: 0.38;
+  filter: blur(0.4px);
+  z-index: 1;
+}
+
+.word-strip__item.is-center {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+  filter: none;
+  z-index: 3;
+}
+
+.word-strip__item.is-right {
+  transform: translate(32%, -50%) scale(0.72);
+  opacity: 0.38;
+  filter: blur(0.4px);
+  z-index: 1;
+}
+
+.word-strip__word {
+  max-width: 100%;
+  font-size: clamp(28px, 7.2vw, 44px);
   font-weight: 800;
-  letter-spacing: -1.6px;
-  line-height: 1.08;
-  text-align: center;
+  letter-spacing: -1px;
+  line-height: 1.1;
   word-break: break-word;
   color: var(--app-font-color-muted, #64748b);
-  transition: color 0.55s ease;
 }
 
-.today-word-carousel__item.is-active .today-word-carousel__word {
+.word-strip__item.is-center .word-strip__word {
+  font-size: clamp(40px, 10vw, 60px);
   color: var(--app-font-color, #0f172a);
 }
 
-.today-word-carousel__phonetic {
-  margin-top: 10px;
-  font-size: 16px;
+.word-strip__phonetic {
+  margin-top: 8px;
+  font-size: 14px;
   color: var(--app-font-color-soft, #94a3b8);
-  transition: opacity 0.55s ease;
 }
 
-.today-word-carousel__item:not(.is-active) .today-word-carousel__phonetic {
-  opacity: 0.45;
-}
-
-.today-word-carousel__meaning {
-  margin-top: 14px;
+.word-strip__meaning {
+  margin-top: 12px;
   max-width: min(360px, 88vw);
-  min-height: 30px;
+  min-height: 28px;
   text-align: center;
 }
 
-.today-word-carousel__meaning-text {
+.word-strip__meaning-text {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   line-height: 1.45;
   color: var(--app-font-color, #0f172a);
 }
 
-.today-word-carousel__meaning-empty {
+.word-strip__meaning-empty {
   margin: 0;
   font-size: 13px;
   color: var(--app-font-color-soft, #94a3b8);
 }
 
-.today-word-carousel__meta {
-  margin: 16px 0 0;
+.word-strip__meta {
+  margin: 14px 0 0;
   font-size: 13px;
-  letter-spacing: 0.02em;
   color: var(--app-font-color-soft, #94a3b8);
   opacity: 0.85;
 }
 
 .meaning-fade-enter-active,
 .meaning-fade-leave-active {
-  transition: opacity 0.22s ease, transform 0.22s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .meaning-fade-enter-from,

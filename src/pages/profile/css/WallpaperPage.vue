@@ -11,6 +11,7 @@ import {
 import { wallpaperService } from '@/services/wallpaper.service'
 import WallpaperUpload from './components/WallpaperUpload.vue'
 import WallpaperEdit from './components/WallpaperEdit.vue'
+import WallpaperUrlImport from './components/WallpaperUrlImport.vue'
 
 import '@/styles/pages/profile/css-pages.css'
 
@@ -186,12 +187,14 @@ function handleEditModeChange(editing: boolean) {
     </header>
 
     <main class="wallpaper-page__content">
+      <WallpaperUrlImport @saved="handleUploaded" />
+
       <div v-if="wallpapers.length === 0" class="wallpaper-empty">
         <div class="wallpaper-empty__icon">
           <Image :size="48" />
         </div>
         <p class="wallpaper-empty__text">还没有壁纸</p>
-        <p class="wallpaper-empty__hint">点击右上角 + 上传壁纸</p>
+        <p class="wallpaper-empty__hint">可上传本地图片，或在上方用链接添加</p>
       </div>
 
       <template v-else>

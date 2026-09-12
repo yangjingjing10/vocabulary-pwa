@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { Plus } from 'lucide-vue-next'
 
 import { addWallpaper } from '@/db/repositories/wallpaper.repository'
+import { looksLikeImageFile, normalizeImageFromFile } from '@/utils/imageNormalize'
 
 const emit = defineEmits<{
   uploaded: []
@@ -15,30 +16,14 @@ function triggerUpload() {
   fileInput.value?.click()
 }
 
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
-
 async function handleFileUpload(event: Event) {
   const target = event.target as HTMLInputElement
   const files = Array.from(target.files ?? [])
   if (files.length === 0) return
 
-  const invalidType = files.find(file => !file.type.startsWith('image/'))
-  if (invalidType) {
-    alert('请只上传图片文件')
-    target.value = ''
-    return
-  }
-
-  const oversized = files.find(file => file.size > 5 * 1024 * 1024)
-  if (oversized) {
-    alert('单张图片大小不能超过 5MB')
+  const invalid = files.find((file) => !looksLikeImageFile(file))
+  if (invalid) {
+    alert('请选择图片文件（JPG / PNG / WebP 等）')
     target.value = ''
     return
   }
@@ -47,22 +32,40 @@ async function handleFileUpload(event: Event) {
 
   try {
     const baseTime = Date.now()
+    let successCount = 0
+    const failures: string[] = []
+
     for (let index = 0; index < files.length; index += 1) {
       const file = files[index]
-      const imageData = await readFileAsDataUrl(file)
-      await addWallpaper({
-        id: `wallpaper-${baseTime}-${index}`,
-        name: file.name.replace(/\.[^/.]+$/, ''),
-        imageData,
-        createdAt: baseTime + index,
-        blur: 0,
-        opacity: 85
-      })
+      try {
+        const imageData = await normalizeImageFromFile(file)
+        await addWallpaper({
+          id: `wallpaper-${baseTime}-${index}`,
+          name: file.name.replace(/\.[^/.]+$/, '') || `wallpaper-${index + 1}`,
+          imageData,
+          createdAt: baseTime + index,
+          blur: 0,
+          opacity: 85,
+        })
+        successCount += 1
+      } catch (error) {
+        console.error('Normalize/upload failed:', file.name, error)
+        failures.push(file.name)
+      }
     }
-    emit('uploaded')
+
+    if (successCount > 0) {
+      emit('uploaded')
+    }
+
+    if (failures.length > 0) {
+      alert(
+        `有 ${failures.length} 张未能导入（可能是 HEIC 等当前浏览器不支持的格式）。\n已成功 ${successCount} 张。\n失败：${failures.slice(0, 3).join('、')}${failures.length > 3 ? '…' : ''}`,
+      )
+    }
   } catch (error) {
     console.error('Upload failed:', error)
-    alert('上传失败，请重试')
+    alert(error instanceof Error ? error.message : '上传失败，请重试')
   } finally {
     isUploading.value = false
     target.value = ''
@@ -82,7 +85,7 @@ async function handleFileUpload(event: Event) {
     <input
       ref="fileInput"
       type="file"
-      accept="image/*"
+      accept="image/*,.heic,.heif,.avif,.bmp,.tif,.tiff"
       multiple
       style="display: none"
       @change="handleFileUpload"

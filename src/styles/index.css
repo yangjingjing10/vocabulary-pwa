@@ -5,6 +5,9 @@
   --app-font-color-muted: color-mix(in srgb, var(--app-font-color) 70%, transparent);
   --app-font-color-soft: color-mix(in srgb, var(--app-font-color) 48%, transparent);
   --app-chrome-font-color: var(--app-font-color);
+  /* 全局字号：作为 rem 根，页面文字用 rem 后会一起缩放 */
+  --app-font-size: 16px;
+  font-size: var(--app-font-size);
   color: var(--app-font-color);
   background: #f8fafc;
   font-synthesis: none;
@@ -94,10 +97,10 @@ body::after {
 }
 
 /*
-  自定义字体颜色：
+  自定义字体颜色 / 字号：
   - --app-font-color 驱动全局正文（各页 CSS 变量 / 继承）
+  - --app-font-size 作为 html rem 根字号，页面用 rem 的文字会一起缩放
   - 顶栏标题与底栏导航额外显式覆盖，避免被局部样式盖住
-  字号跟随系统设置，不在此覆盖。
   由 fontService 在 html 上挂 class 启用。
 */
 html.app-chrome-font-custom .home-header h1,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, toRef } from 'vue'
 import { ArrowLeft, Loader2, Pause } from 'lucide-vue-next'
 
 import { useQuizState } from './composables/useQuizState'
@@ -12,6 +12,7 @@ import type { QuizPauseResult } from './types/quizPause'
 import type { QuizResult } from './types/quiz'
 import type { QuizBatch, QuizWord } from './types/quizPause'
 import { getCorrectAnswer } from './utils/quizAnswerMatch'
+import { mergePendingWrongWords } from '@/db/repositories/choice-practice-state.repository'
 
 import '@/styles/pages/word-quiz-page.css'
 
@@ -50,7 +51,6 @@ const {
   skipQuestion,
   collectGradedResults,
   setResults,
-  retryQuiz,
   setStatus,
 } = useQuizState(props.words)
 
@@ -64,14 +64,18 @@ const {
   markBatchPaused,
   getPendingWords,
   getCheckedWords,
+  getWrongWords,
   clearBatch,
-} = useQuizPause()
+} = useQuizPause(toRef(props, 'date'))
 
 const showPausePanel = ref(false)
 const pauseResult = ref<QuizPauseResult | null>(null)
 const showResumeDialog = ref(false)
 const pendingBatch = ref<QuizBatch | null>(null)
 const pendingRemaining = ref<QuizWord[]>([])
+/** 查看暂停结果后仍有剩余题 */
+const isPartialResults = ref(false)
+const remainingAfterPause = ref(0)
 
 onMounted(async () => {
   const unfinishedBatch = loadUnfinishedBatch()
@@ -95,6 +99,8 @@ onMounted(async () => {
 
 async function startFreshQuiz() {
   clearBatch()
+  isPartialResults.value = false
+  remainingAfterPause.value = 0
   await initializeQuiz()
   createBatch(
     questions.value.map((q) => ({
@@ -108,6 +114,8 @@ async function startFreshQuiz() {
 function handleResumeContinue() {
   if (!pendingBatch.value) return
   showResumeDialog.value = false
+  isPartialResults.value = false
+  remainingAfterPause.value = 0
   loadUnfinishedTest(pendingBatch.value, pendingRemaining.value)
   pendingBatch.value = null
   pendingRemaining.value = []
@@ -131,6 +139,8 @@ function loadUnfinishedTest(batch: QuizBatch, remainingWords: QuizWord[]) {
 
   currentQuestionIndex.value = 0
   userAnswer.value = ''
+  isPartialResults.value = false
+  remainingAfterPause.value = 0
   setStatus('testing')
 }
 
@@ -156,6 +166,17 @@ function persistQuestionByRef(
   })
 }
 
+async function persistSessionWrongs(batch: QuizBatch | null) {
+  if (!batch || !props.date) return
+  const wrongs = getWrongWords(batch)
+  if (wrongs.length === 0) return
+  try {
+    await mergePendingWrongWords(props.date, wrongs)
+  } catch (error) {
+    console.error('Failed to save wrong words:', error)
+  }
+}
+
 function batchWordToResult(word: QuizWord): QuizResult {
   const skipped = Boolean(word.skipped)
   return {
@@ -175,7 +196,7 @@ function batchWordToResult(word: QuizWord): QuizResult {
   }
 }
 
-function finishWithLocalResults() {
+async function finishWithLocalResults() {
   // 先把本轮最后几题写入 batch
   questions.value.forEach((q) => {
     if (!q.gradeResult || !currentBatch.value) return
@@ -194,6 +215,9 @@ function finishWithLocalResults() {
       : []
 
   setResults([...earlierResults, ...sessionResults])
+  isPartialResults.value = false
+  remainingAfterPause.value = 0
+  await persistSessionWrongs(currentBatch.value)
   clearBatch()
 }
 
@@ -209,7 +233,7 @@ function handleNext() {
   }
 
   if (outcome === 'finished') {
-    finishWithLocalResults()
+    void finishWithLocalResults()
   }
 }
 
@@ -225,7 +249,7 @@ function handleSkip() {
   }
 
   if (outcome === 'finished') {
-    finishWithLocalResults()
+    void finishWithLocalResults()
   }
 }
 
@@ -271,6 +295,7 @@ async function handlePause() {
     setStatus('grading')
     const result = await pauseAndCheck(batch)
     pauseResult.value = result
+    await persistSessionWrongs(batch)
     showPausePanel.value = true
     setStatus('testing')
   } catch (error) {
@@ -280,14 +305,16 @@ async function handlePause() {
   }
 }
 
-function handleViewPauseResults() {
+async function handleViewPauseResults() {
   showPausePanel.value = false
 
   if (!pauseResult.value || !currentBatch.value) {
     return
   }
 
-  const checkedWords = getCheckedWords(currentBatch.value)
+  const batch = currentBatch.value
+  const remainingWords = getPendingWords(batch)
+  const checkedWords = getCheckedWords(batch)
   const quizResults: QuizResult[] = checkedWords.map((word) => ({
     word: word.word,
     userAnswer: word.skipped ? '' : word.userAnswer,
@@ -303,7 +330,18 @@ function handleViewPauseResults() {
   }))
 
   setResults(quizResults)
-  clearBatch()
+  await persistSessionWrongs(batch)
+
+  // 还有剩余题：保留批次，下次/本页可续测；不要 clearBatch
+  if (remainingWords.length > 0) {
+    isPartialResults.value = true
+    remainingAfterPause.value = remainingWords.length
+    markBatchPaused(batch)
+  } else {
+    isPartialResults.value = false
+    remainingAfterPause.value = 0
+    clearBatch()
+  }
 }
 
 function handleContinueTest() {
@@ -314,15 +352,29 @@ function handleContinueTest() {
   const remainingWords = getPendingWords(currentBatch.value)
 
   if (remainingWords.length === 0) {
-    handleViewPauseResults()
+    void handleViewPauseResults()
     return
   }
 
   loadUnfinishedTest(currentBatch.value, remainingWords)
 }
 
+function handleContinueFromResults() {
+  const batch = currentBatch.value || loadUnfinishedBatch()
+  if (!batch) return
+
+  const remainingWords = getPendingWords(batch)
+  if (remainingWords.length === 0) {
+    isPartialResults.value = false
+    remainingAfterPause.value = 0
+    return
+  }
+
+  loadUnfinishedTest(batch, remainingWords)
+}
+
 function handleClosePausePanel() {
-  // 关闭弹窗视为确认暂停并离开进度已保存
+  // 关闭弹窗视为确认暂停，进度已保存
   if (currentBatch.value) {
     markBatchPaused(currentBatch.value)
   }
@@ -343,23 +395,30 @@ function handleGoToAdvancedPractice() {
 
 function handleBack() {
   // 返回前把已做进度落盘，下次可续测
-  if (currentBatch.value && !isCompleted.value) {
-    questions.value.forEach((q) => {
-      if (!q.gradeResult || !currentBatch.value) return
-      const skipped = !q.userAnswer.trim()
-      syncQuestionProgress(currentBatch.value, {
-        word: q.word,
-        translation: q.translation,
-        direction: q.direction,
-        userAnswer: skipped ? '' : q.userAnswer,
-        skipped,
-        gradeResult: q.gradeResult,
+  // 阶段结果页也要保留批次（isPartialResults）
+  if (currentBatch.value && (!isCompleted.value || isPartialResults.value)) {
+    if (!isCompleted.value) {
+      questions.value.forEach((q) => {
+        if (!q.gradeResult || !currentBatch.value) return
+        const skipped = !q.userAnswer.trim()
+        syncQuestionProgress(currentBatch.value, {
+          word: q.word,
+          translation: q.translation,
+          direction: q.direction,
+          userAnswer: skipped ? '' : q.userAnswer,
+          skipped,
+          gradeResult: q.gradeResult,
+        })
       })
-    })
+    }
     markBatchPaused(currentBatch.value)
   }
   emit('back')
 }
+
+const resultsTitle = computed(() =>
+  isPartialResults.value ? '阶段检测结果' : '测试完成',
+)
 </script>
 
 <template>
@@ -412,6 +471,9 @@ function handleBack() {
 
       <QuizResults
         v-else-if="isCompleted"
+        :title="resultsTitle"
+        :is-partial="isPartialResults"
+        :remaining-count="remainingAfterPause"
         :results="results"
         :accuracy="accuracy"
         :correct-count="correctCount"
@@ -419,6 +481,7 @@ function handleBack() {
         :incorrect-results="incorrectResults"
         :skipped-results="skippedResults"
         @retry="handleRetry"
+        @continue-remaining="handleContinueFromResults"
         @advancedPractice="handleGoToAdvancedPractice"
         @back="handleBack"
       />

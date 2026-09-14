@@ -5,6 +5,7 @@ import { ArrowLeft, Camera, Check, FileText, Image, Loader2, Save, Trash2, Uploa
 import { addWord } from '@/db/repositories/words.repository'
 import type { VocabularyWord } from '@/db/schema/database'
 import { resolveDefinitionsForImport } from '@/services/dictionary-api.service'
+import { todayLocalDate } from '@/utils/localDate'
 
 import '@/styles/pages/word-import-page.css'
 
@@ -200,7 +201,7 @@ async function confirmSave() {
     )
 
     processingHint.value = 'Saving words...'
-    const today = new Date().toISOString().split('T')[0]
+    const today = todayLocalDate()
     let withDefs = 0
 
     for (const item of words.value) {

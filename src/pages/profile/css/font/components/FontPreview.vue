@@ -2,6 +2,7 @@
 defineProps<{
   fontFamily: string
   color: string
+  fontSize: number
 }>()
 </script>
 
@@ -12,7 +13,8 @@ defineProps<{
       class="font-preview"
       :style="{
         fontFamily: fontFamily ? `'${fontFamily}', sans-serif` : undefined,
-        color
+        color,
+        fontSize: `${fontSize}px`,
       }"
     >
       <p class="font-preview__sample">

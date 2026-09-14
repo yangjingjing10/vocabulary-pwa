@@ -1,9 +1,9 @@
-import { ref, computed } from 'vue'
+import { ref, computed, toValue, type MaybeRefOrGetter } from 'vue'
 import type { QuizWord, QuizBatch, QuizPauseResult } from '../types/quizPause'
 import type { QuizDirection } from '../types/quiz'
 import { checkQuizAnswer, getCorrectAnswer } from '../utils/quizAnswerMatch'
 
-const STORAGE_KEY = 'quiz_current_batch'
+const LEGACY_STORAGE_KEY = 'quiz_current_batch'
 
 export type QuizBatchSeed = {
   word: string
@@ -12,11 +12,16 @@ export type QuizBatchSeed = {
 }
 
 /**
- * 单词测试暂停 / 续测逻辑
+ * 单词测试暂停 / 续测逻辑（按日期隔离批次，避免串天）
  */
-export function useQuizPause() {
+export function useQuizPause(date?: MaybeRefOrGetter<string>) {
   const currentBatch = ref<QuizBatch | null>(null)
   const isPausing = ref(false)
+
+  function getStorageKey() {
+    const d = (toValue(date) || '').trim()
+    return d ? `${LEGACY_STORAGE_KEY}:${d}` : LEGACY_STORAGE_KEY
+  }
 
   function createBatch(seeds: QuizBatchSeed[]): QuizBatch {
     const batchId = `batch-${Date.now()}`
@@ -32,6 +37,7 @@ export function useQuizPause() {
 
     const batch: QuizBatch = {
       batchId,
+      date: (toValue(date) || '').trim() || undefined,
       createdAt: Date.now(),
       words: quizWords,
       status: 'ongoing',
@@ -44,24 +50,47 @@ export function useQuizPause() {
     return batch
   }
 
+  function readStoredBatch(raw: string | null): QuizBatch | null {
+    if (!raw) return null
+    try {
+      const batch: QuizBatch = JSON.parse(raw)
+      if (batch.status !== 'ongoing' && batch.status !== 'paused') return null
+      if (getPendingWords(batch).length === 0) return null
+
+      const d = (toValue(date) || '').trim()
+      if (d && batch.date && batch.date !== d) return null
+
+      return batch
+    } catch (error) {
+      console.error('Failed to parse batch:', error)
+      return null
+    }
+  }
+
   function loadUnfinishedBatch(): QuizBatch | null {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (!stored) return null
+      const key = getStorageKey()
+      let batch = readStoredBatch(localStorage.getItem(key))
 
-      const batch: QuizBatch = JSON.parse(stored)
-
-      if (batch.status === 'ongoing' || batch.status === 'paused') {
-        // 还有未处理的题才算未完成
-        if (getPendingWords(batch).length === 0) {
-          localStorage.removeItem(STORAGE_KEY)
-          return null
+      // 兼容旧版全局 key，迁移到按日期存储
+      if (!batch && key !== LEGACY_STORAGE_KEY) {
+        const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY)
+        const legacy = readStoredBatch(legacyRaw)
+        if (legacy) {
+          const d = (toValue(date) || '').trim()
+          if (!d || !legacy.date || legacy.date === d) {
+            if (d && !legacy.date) legacy.date = d
+            batch = legacy
+            saveBatchToStorage(legacy)
+            localStorage.removeItem(LEGACY_STORAGE_KEY)
+          }
         }
-        currentBatch.value = batch
-        return batch
       }
 
-      return null
+      if (!batch) return null
+
+      currentBatch.value = batch
+      return batch
     } catch (error) {
       console.error('Failed to load batch:', error)
       return null
@@ -70,7 +99,9 @@ export function useQuizPause() {
 
   function saveBatchToStorage(batch: QuizBatch) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(batch))
+      const d = (toValue(date) || '').trim()
+      if (d && !batch.date) batch.date = d
+      localStorage.setItem(getStorageKey(), JSON.stringify(batch))
     } catch (error) {
       console.error('Failed to save batch:', error)
     }
@@ -78,7 +109,11 @@ export function useQuizPause() {
 
   function clearBatch() {
     currentBatch.value = null
-    localStorage.removeItem(STORAGE_KEY)
+    try {
+      localStorage.removeItem(getStorageKey())
+    } catch (error) {
+      console.error('Failed to clear batch:', error)
+    }
   }
 
   /** 用户已作答、等待/已完成判题 */
@@ -107,8 +142,16 @@ export function useQuizPause() {
     return batch.words.filter((w) => w.aiResult !== undefined || w.skipped)
   }
 
+  function getWrongWords(batch: QuizBatch): string[] {
+    return getCheckedWords(batch)
+      .filter((w) => w.skipped || w.aiResult?.correct === false)
+      .map((w) => w.word)
+      .filter(Boolean)
+  }
+
   function findWord(batch: QuizBatch, word: string): QuizWord | undefined {
-    return batch.words.find((w) => w.word === word)
+    const key = word.trim().toLowerCase()
+    return batch.words.find((w) => w.word.trim().toLowerCase() === key)
   }
 
   /** 同步单题进度到 batch 并立即落盘 */
@@ -314,6 +357,7 @@ export function useQuizPause() {
     getUnansweredWords,
     getPendingWords,
     getCheckedWords,
+    getWrongWords,
     saveBatchToStorage,
   }
 }

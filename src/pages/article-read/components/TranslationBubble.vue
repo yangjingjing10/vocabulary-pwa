@@ -119,7 +119,7 @@ defineExpose({ focusEditor })
   max-height: 200px;
   overflow-y: auto;
   outline: none;
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.6;
   color: var(--app-font-color, #1d1d1f);
   word-break: break-word;
@@ -144,7 +144,7 @@ defineExpose({ focusEditor })
 .translation-bubble__hint {
   margin-left: 12px;
   align-self: flex-end;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--app-font-color-soft, #c7c7cc);
   white-space: nowrap;
   opacity: 0;

@@ -389,7 +389,15 @@ export function useChoiceQuiz(
             explanation: d.explanation,
           })),
         })
-        await markWordsPracticed(practiceDate, usedWords)
+        // 只把答对的标为已练；错题重新并入待练，避免「练过就从错题池消失」
+        const correctWords = details.filter((d) => d.isCorrect).map((d) => d.word).filter(Boolean)
+        const wrongWords = details.filter((d) => !d.isCorrect).map((d) => d.word).filter(Boolean)
+        if (correctWords.length > 0) {
+          await markWordsPracticed(practiceDate, correctWords)
+        }
+        if (wrongWords.length > 0) {
+          await mergePendingWrongWords(practiceDate, wrongWords)
+        }
       } catch (error) {
         console.error('保存选择题记录失败:', error)
       } finally {

@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { ArrowLeft, Loader2, Volume2, X, RefreshCw, Sparkles, Pencil } from 'lucide-vue-next'
 
 import ParagraphTranslation from '@/pages/article-read/components/ParagraphTranslation.vue'
 import DrawingToolbar from '@/pages/article-read/components/drawing/DrawingToolbar.vue'
+import ArticleDeleteConfirmModal from '@/pages/article-read/components/ArticleDeleteConfirmModal.vue'
 import { useDrawingSession } from '@/pages/article-read/composables/useDrawingSession'
+import { useArticleLongPress } from '@/pages/article-read/composables/useArticleLongPress'
 import {
   ensureLocalDictionary,
   lookupLocalDictionary,
 } from '@/services/local-dictionary.service'
 import { articleGenerationService } from '@/services/article-generation.service'
+import { deleteArticle } from '@/db/repositories/articles.repository'
 import type { Article } from '@/db/schema/database'
 import { speakText } from '@/services/speech.service'
 
@@ -61,6 +64,20 @@ const {
   setWidth: setDrawingWidth,
 } = useDrawingSession()
 
+const isDeleting = ref(false)
+const {
+  pendingId: pendingDeleteId,
+  onPointerDown: onArticlePointerDown,
+  onPointerMove: onArticlePointerMove,
+  onPointerUp: onArticlePointerUp,
+  onContextMenu: onArticleContextMenu,
+  close: closeDeleteConfirm,
+} = useArticleLongPress(() => isDrawingMode.value || isGenerating.value || isDeleting.value)
+
+const pendingDeleteArticle = computed(
+  () => articles.value.find((article) => article.id === pendingDeleteId.value) ?? null,
+)
+
 onMounted(() => {
   // 若已有同批会话文章就直接展示；否则后台开生成（离开页也继续）
   if (articleGenerationService.sessionArticles.value.length === 0) {
@@ -84,6 +101,24 @@ function generateArticle() {
 
 function startPractice() {
   emit('startPractice', props.selectedWords)
+}
+
+async function confirmDeleteArticle() {
+  const target = pendingDeleteArticle.value
+  if (!target || isDeleting.value) return
+
+  isDeleting.value = true
+  try {
+    articleGenerationService.removeFromSession(target.id)
+    closeDeleteConfirm()
+    await nextTick()
+    await deleteArticle(target.id)
+  } catch (error) {
+    console.error('Failed to delete article:', error)
+    closeDeleteConfirm()
+  } finally {
+    isDeleting.value = false
+  }
 }
 
 async function handleWordClick(event: MouseEvent) {
@@ -236,21 +271,37 @@ function formatTime(timestamp: number) {
           <span>正在后台生成…离开页面也会继续</span>
         </div>
 
+        <div v-else-if="articles.length === 0" class="article-read-error">
+          <h3>暂无文章</h3>
+          <p>已删除当前文章，可以重新生成一篇</p>
+          <button type="button" @click="generateArticle">重新生成</button>
+        </div>
+
         <article
           v-for="(article, index) in articles"
           :key="article.id"
           class="article-read-body"
           :class="{ 'is-new': article.isNew }"
         >
-          <div v-if="articles.length > 1" class="article-meta">
-            <span v-if="article.isNew" class="article-badge article-badge--new">
-              <Sparkles :size="14" />
-              新生成
-            </span>
-            <span class="article-timestamp">{{ formatTime(article.createdAt) }}</span>
-          </div>
+          <div
+            class="article-read-heading"
+            @pointerdown="onArticlePointerDown(article.id, $event)"
+            @pointermove="onArticlePointerMove"
+            @pointerup="onArticlePointerUp"
+            @pointercancel="onArticlePointerUp"
+            @pointerleave="onArticlePointerUp"
+            @contextmenu="onArticleContextMenu(article.id, $event)"
+          >
+            <div v-if="articles.length > 1" class="article-meta">
+              <span v-if="article.isNew" class="article-badge article-badge--new">
+                <Sparkles :size="14" />
+                新生成
+              </span>
+              <span class="article-timestamp">{{ formatTime(article.createdAt) }}</span>
+            </div>
 
-          <h2 class="article-read-title">{{ article.title }}</h2>
+            <h2 class="article-read-title">{{ article.title }}</h2>
+          </div>
 
           <ParagraphTranslation
             :article-id="article.id"
@@ -271,6 +322,13 @@ function formatTime(timestamp: number) {
         </article>
       </div>
     </main>
+
+    <ArticleDeleteConfirmModal
+      :show="!!pendingDeleteArticle"
+      :title="pendingDeleteArticle?.title ?? ''"
+      @close="closeDeleteConfirm"
+      @confirm="confirmDeleteArticle"
+    />
 
     <DrawingToolbar
       v-if="isDrawingMode"

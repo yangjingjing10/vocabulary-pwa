@@ -2,7 +2,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { Sparkles } from 'lucide-vue-next'
 import { getParagraphTranslations, saveParagraphTranslation } from '@/db/repositories/paragraph-translation.repository'
-import { mockAiRevision } from '../utils/textDiff'
+import { reviseParagraphTranslations } from '@/services/paragraph-revision.service'
 import InlineTranslationToggle from './InlineTranslationToggle.vue'
 import TranslationBubble from './TranslationBubble.vue'
 import TranslationDiff from './TranslationDiff.vue'
@@ -46,6 +46,7 @@ interface ParagraphData {
 
 const paragraphs = ref<ParagraphData[]>([])
 const isRevising = ref(false)
+const revisionError = ref('')
 
 const translatedParagraphs = computed(() =>
   paragraphs.value.filter(p => p.userTranslation.trim() !== '')
@@ -161,24 +162,47 @@ async function commitSave(index: number) {
   }
 }
 
-/** 测试模式：只处理已翻译段落，未翻译的跳过；不调用真实 AI */
+/** 对已翻译段落调用 AI 润色；未翻译的跳过 */
 async function requestAIRevision() {
   if (translatedCount.value === 0 || isRevising.value) return
 
   isRevising.value = true
+  revisionError.value = ''
+
   try {
-    await new Promise(resolve => setTimeout(resolve, 900))
+    const inputs = translatedParagraphs.value.map((para) => ({
+      index: para.index,
+      english: para.textContent,
+      userTranslation: para.userTranslation.trim(),
+    }))
+
+    const results = await reviseParagraphTranslations(inputs)
+    if (results.length === 0) {
+      throw new Error('AI 未返回有效修改')
+    }
+
+    const byIndex = new Map(results.map((item) => [item.index, item.revised]))
 
     for (const para of translatedParagraphs.value) {
+      const revised = byIndex.get(para.index)?.trim()
+      if (!revised) continue
+      // 与原文完全相同则不展示无意义 Diff
+      if (revised === para.userTranslation.trim()) continue
+
       para.diffBase = ''
-      para.aiRevision = mockAiRevision(para.userTranslation, para.index)
+      para.aiRevision = revised
       para.isExpanded = true
       para.isEditing = false
       await persistParagraph(para)
     }
+
+    const applied = translatedParagraphs.value.some((para) => para.aiRevision.trim())
+    if (!applied) {
+      revisionError.value = 'AI 未提出实质修改'
+    }
   } catch (error) {
-    console.error('Failed to mock AI revision:', error)
-    alert('生成建议失败')
+    console.error('Failed to revise translations:', error)
+    revisionError.value = error instanceof Error ? error.message : '生成建议失败'
   } finally {
     isRevising.value = false
   }
@@ -237,8 +261,9 @@ function handleWordClick(event: MouseEvent) {
           （{{ translatedCount }}）
         </span>
       </button>
-      <span class="ai-revision-bar__hint">未翻译段落会跳过 · 测试模式</span>
+      <span class="ai-revision-bar__hint">未翻译段落会跳过</span>
     </div>
+    <p v-if="revisionError" class="ai-revision-bar__error">{{ revisionError }}</p>
 
     <div
       v-for="para in paragraphs"
@@ -326,7 +351,7 @@ function handleWordClick(event: MouseEvent) {
   border: 0;
   background: transparent;
   color: var(--app-font-color-muted, #8e8e93);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
   transition: color 0.15s ease;
@@ -346,8 +371,15 @@ function handleWordClick(event: MouseEvent) {
 }
 
 .ai-revision-bar__hint {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--app-font-color-soft, #d2d2d7);
+}
+
+.ai-revision-bar__error {
+  margin: -10px 0 14px;
+  color: #b91c1c;
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 
 .paragraph-item {
@@ -361,7 +393,7 @@ function handleWordClick(event: MouseEvent) {
 .paragraph-text {
   position: relative;
   color: var(--app-font-color, #1d1d1f);
-  font-size: clamp(17px, 1.6vw, 21px);
+  font-size: clamp(1.0625rem, 1.6vw, 1.3125rem);
   line-height: 1.8;
   letter-spacing: 0.1px;
 }
@@ -401,7 +433,7 @@ function handleWordClick(event: MouseEvent) {
   border-left: 2px solid #e5e5ea;
   background: transparent;
   color: var(--app-font-color-muted, #86868b);
-  font-size: 16px;
+  font-size: 1rem;
   font-style: italic;
   line-height: 1.6;
   text-align: left;

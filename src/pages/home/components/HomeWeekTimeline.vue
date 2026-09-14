@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { addLocalDays, formatLocalDate, parseLocalDate, todayLocalDate } from '@/utils/localDate'
 
 export interface TimelineDay {
   date: string
@@ -20,24 +21,21 @@ const emit = defineEmits<{
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
 
 function toDateStr(d: Date) {
-  return d.toISOString().split('T')[0]
+  return formatLocalDate(d)
 }
 
 function startOfWeekMonday(base: Date) {
-  const d = new Date(base)
+  const d = new Date(base.getFullYear(), base.getMonth(), base.getDate())
   const day = d.getDay()
   const diff = day === 0 ? -6 : 1 - day
-  d.setDate(d.getDate() + diff)
-  d.setHours(12, 0, 0, 0)
-  return d
+  return addLocalDays(d, diff)
 }
 
 function buildWeek(anchor: Date): TimelineDay[] {
   const start = startOfWeekMonday(anchor)
-  const todayStr = toDateStr(new Date())
+  const todayStr = todayLocalDate()
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start)
-    d.setDate(start.getDate() + i)
+    const d = addLocalDays(start, i)
     const date = toDateStr(d)
     return {
       date,
@@ -51,13 +49,13 @@ function buildWeek(anchor: Date): TimelineDay[] {
 const weekDays = ref<TimelineDay[]>(buildWeek(new Date()))
 
 const selectedDate = computed({
-  get: () => props.modelValue || toDateStr(new Date()),
+  get: () => props.modelValue || todayLocalDate(),
   set: (value: string) => emit('update:modelValue', value),
 })
 
 const headerDateLabel = computed(() => {
   const target = weekDays.value.find((d) => d.date === selectedDate.value)
-  const d = target ? new Date(`${target.date}T12:00:00`) : new Date()
+  const d = target ? parseLocalDate(target.date) : new Date()
   return d.toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
@@ -81,7 +79,7 @@ watch(
     if (!value) return
     const inWeek = weekDays.value.some((d) => d.date === value)
     if (!inWeek) {
-      weekDays.value = buildWeek(new Date(`${value}T12:00:00`))
+      weekDays.value = buildWeek(parseLocalDate(value))
     }
   },
 )
@@ -145,14 +143,14 @@ watch(
 
 .home-week-timeline__date {
   margin: 0 0 4px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--app-font-color-soft, #94a3b8);
 }
 
 .home-week-timeline__title {
   margin: 0;
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1.1;
@@ -172,7 +170,7 @@ watch(
 .home-week-timeline__avatar--fallback {
   display: grid;
   place-items: center;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   color: var(--app-font-color-muted, #64748b);
 }
@@ -209,13 +207,13 @@ watch(
 }
 
 .home-week-timeline__num {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 650;
   line-height: 1;
 }
 
 .home-week-timeline__weekday {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
   line-height: 1;
 }

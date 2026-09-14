@@ -34,7 +34,8 @@ export async function getChoicePracticeState(date: string): Promise<ChoicePracti
 }
 
 /**
- * 合并新的错词到待练列表（已练习过的不会再加入）
+ * 合并新的错词到待练列表。
+ * 若词曾被误标为已练，会从 practiced 中移出以便继续练习。
  */
 export async function mergePendingWrongWords(
   date: string,
@@ -42,15 +43,21 @@ export async function mergePendingWrongWords(
 ): Promise<ChoicePracticeState> {
   const db = await initDatabase()
   const current = (await db.get('choicePracticeStates', date)) ?? emptyState(date)
-  const practiced = new Set(current.practicedWords.map(normalize))
+  const wrongKeys = new Set(wrongWords.map(normalize).filter(Boolean))
+
+  const practicedWords = current.practicedWords.filter(
+    (w) => !wrongKeys.has(normalize(w)),
+  )
+  const practiced = new Set(practicedWords.map(normalize))
 
   const mergedPending = uniquePreserveOrder([
     ...current.pendingWrongWords,
-    ...wrongWords.filter((w) => !practiced.has(normalize(w))),
+    ...wrongWords,
   ]).filter((w) => !practiced.has(normalize(w)))
 
   const next: ChoicePracticeState = {
     ...current,
+    practicedWords,
     pendingWrongWords: mergedPending,
     updatedAt: Date.now(),
   }

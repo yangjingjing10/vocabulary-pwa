@@ -1,11 +1,13 @@
 import { openDB } from 'idb'
 
 import { initDatabase } from '@/db/index'
+import { todayLocalDate } from '@/utils/localDate'
 
 export const BACKUP_FORMAT = 'ai-context-vocabulary-backup'
 export const BACKUP_VERSION = 1
 
 const QUIZ_STORAGE_KEY = 'quiz_current_batch'
+const FONT_SIZE_STORAGE_KEY = 'app_font_size'
 
 /** 用户数据表（排除可重建的离线大词库 localDict / localDictMeta） */
 const MAIN_USER_STORES = [
@@ -43,6 +45,7 @@ export interface BackupPayload {
   }
   localStorage: {
     quiz_current_batch: string | null
+    app_font_size: string | null
   }
   meta: {
     excludedStores: string[]
@@ -166,6 +169,7 @@ export async function exportAllData(): Promise<BackupPayload> {
     },
     localStorage: {
       quiz_current_batch: localStorage.getItem(QUIZ_STORAGE_KEY),
+      app_font_size: localStorage.getItem(FONT_SIZE_STORAGE_KEY),
     },
     meta: {
       excludedStores: ['localDict', 'localDictMeta'],
@@ -175,7 +179,7 @@ export async function exportAllData(): Promise<BackupPayload> {
 }
 
 export function downloadBackupJson(payload: BackupPayload) {
-  const date = new Date().toISOString().slice(0, 10)
+  const date = todayLocalDate()
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: 'application/json',
   })
@@ -261,6 +265,13 @@ export async function importAllData(payload: BackupPayload): Promise<BackupSumma
     localStorage.setItem(QUIZ_STORAGE_KEY, quizBatch)
   } else {
     localStorage.removeItem(QUIZ_STORAGE_KEY)
+  }
+
+  const fontSize = payload.localStorage?.app_font_size
+  if (typeof fontSize === 'string' && fontSize.length > 0) {
+    localStorage.setItem(FONT_SIZE_STORAGE_KEY, fontSize)
+  } else {
+    localStorage.removeItem(FONT_SIZE_STORAGE_KEY)
   }
 
   return {

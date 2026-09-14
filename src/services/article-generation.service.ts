@@ -3,6 +3,7 @@ import { addArticle } from '@/db/repositories/articles.repository'
 import { getApiConfig } from '@/db/repositories/api-config.repository'
 import { getActivePromptConfig } from '@/db/repositories/prompt-config.repository'
 import type { Article } from '@/db/schema/database'
+import { todayLocalDate } from '@/utils/localDate'
 
 export type ArticleGenStatus = 'idle' | 'generating' | 'success' | 'error'
 
@@ -84,11 +85,24 @@ class ArticleGenerationService {
     this.sessionArticles.value = []
   }
 
+  removeFromSession(id: string) {
+    this.sessionArticles.value = this.sessionArticles.value.filter((article) => article.id !== id)
+  }
+
   /**
    * 启动后台生成。若已在生成中则忽略（避免重复请求）。
+   * session: append 追加到当前会话；replace 先清空再写入；none 只落库不改会话。
    */
-  async start(words: string[], options: { appendToSession?: boolean } = {}): Promise<Article | null> {
-    if (!words.length) {
+  async start(
+    words: string[],
+    options: {
+      appendToSession?: boolean
+      session?: 'append' | 'replace' | 'none'
+      date?: string
+    } = {},
+  ): Promise<Article | null> {
+    const plainWords = Array.from(words ?? [], (word) => String(word))
+    if (!plainWords.length) {
       this.status.value = 'error'
       this.lastError.value = '未选择单词'
       this.emit()
@@ -99,15 +113,16 @@ class ArticleGenerationService {
       return null
     }
 
-    const append = options.appendToSession ?? true
-    if (!append) {
+    const sessionMode: 'append' | 'replace' | 'none' =
+      options.session ?? (options.appendToSession === false ? 'replace' : 'append')
+    if (sessionMode === 'replace') {
       this.sessionArticles.value = []
     }
 
     const currentRun = ++this.runId
     this.status.value = 'generating'
     this.lastError.value = ''
-    this.lastWords.value = [...words]
+    this.lastWords.value = plainWords
     this.emit()
 
     try {
@@ -129,7 +144,7 @@ class ArticleGenerationService {
           model: apiConfig.textModel,
           messages: [
             { role: 'system', content: buildSystemPrompt(promptConfig) },
-            { role: 'user', content: buildUserPrompt(words) },
+            { role: 'user', content: buildUserPrompt(plainWords) },
           ],
           temperature: 0.7,
         }),
@@ -150,15 +165,15 @@ class ArticleGenerationService {
         .filter((line: string) => line.trim())
       const articleTitle = lines[0].replace(/^#+\s*/, '')
       let articleBody = lines.slice(1).join('\n\n')
-      articleBody = highlightWords(articleBody, words)
+      articleBody = highlightWords(articleBody, plainWords)
       articleBody = formatContentAsParagraphs(articleBody)
 
       const article: Article = {
         id: `article-${Date.now()}`,
         title: articleTitle,
         content: articleBody,
-        words: [...words],
-        date: new Date().toISOString().split('T')[0],
+        words: [...plainWords],
+        date: options.date || todayLocalDate(),
         createdAt: Date.now(),
       }
 
@@ -168,7 +183,11 @@ class ArticleGenerationService {
       if (currentRun !== this.runId) return article
 
       this.lastArticle.value = article
-      this.sessionArticles.value = [article, ...this.sessionArticles.value]
+      if (sessionMode === 'append') {
+        this.sessionArticles.value = [article, ...this.sessionArticles.value]
+      } else if (sessionMode === 'replace') {
+        this.sessionArticles.value = [article]
+      }
       this.status.value = 'success'
       this.emit()
       return article

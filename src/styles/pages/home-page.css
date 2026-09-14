@@ -50,7 +50,7 @@
   place-items: center;
   background: var(--home-primary-soft);
   color: var(--home-primary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
@@ -153,7 +153,7 @@
 
 .import-modal__header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 800;
 }
 
@@ -222,7 +222,7 @@
 
 .import-card h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   text-align: center;
 }
@@ -230,7 +230,7 @@
 .import-card p {
   margin: 0;
   color: var(--app-font-color-muted, #64748b);
-  font-size: 11px;
+  font-size: 0.6875rem;
   text-align: center;
   line-height: 1.4;
 }

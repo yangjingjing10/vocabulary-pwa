@@ -21,8 +21,7 @@ const emit = defineEmits<{
         </div>
         <h2 class="quiz-resume-panel__title">未完成的测试</h2>
         <p class="quiz-resume-panel__desc">
-          检测到剩余 <strong>{{ remainingCount }}</strong> 个单词尚未作答。
-          是否继续上次的测试？
+          检测到剩余 <strong>{{ remainingCount }}</strong> 个单词尚未作答，可接着测完。
         </p>
         <div class="quiz-resume-panel__actions">
           <button
@@ -30,14 +29,14 @@ const emit = defineEmits<{
             class="quiz-resume-panel__button quiz-resume-panel__button--ghost"
             @click="emit('startNew')"
           >
-            开始新测试
+            放弃进度，全部重测
           </button>
           <button
             type="button"
             class="quiz-resume-panel__button quiz-resume-panel__button--solid"
             @click="emit('continue')"
           >
-            继续测试
+            继续剩余 {{ remainingCount }} 个
           </button>
         </div>
       </div>
@@ -84,13 +83,13 @@ const emit = defineEmits<{
 
 .quiz-resume-panel__title {
   margin: 0 0 10px;
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 600;
 }
 
 .quiz-resume-panel__desc {
   margin: 0 0 24px;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.6;
   color: rgba(255, 255, 255, 0.55);
 }
@@ -112,7 +111,7 @@ const emit = defineEmits<{
   justify-content: center;
   height: 48px;
   border-radius: 14px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;

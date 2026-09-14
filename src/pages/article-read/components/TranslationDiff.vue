@@ -57,7 +57,7 @@ const isAccepted = computed(() => props.mode === 'accepted')
 
 .translation-diff__body {
   margin: 0;
-  font-size: clamp(15px, 1.35vw, 18px);
+  font-size: clamp(0.9375rem, 1.35vw, 1.125rem);
   line-height: 1.65;
   color: var(--app-font-color-muted, #86868b);
   word-break: break-word;
@@ -93,7 +93,7 @@ const isAccepted = computed(() => props.mode === 'accepted')
   padding: 0;
   border: 0;
   background: transparent;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
   transition: color 0.15s ease;
@@ -117,7 +117,7 @@ const isAccepted = computed(() => props.mode === 'accepted')
 
 .diff-action-sep {
   color: var(--app-font-color-soft, #d2d2d7);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1;
 }
 

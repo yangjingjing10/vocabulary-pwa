@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { ArrowLeft, Loader2, Volume2, X, RefreshCw, Sparkles, Pencil } from 'lucide-vue-next'
 
-import { getArticle, addArticle } from '@/db/repositories/articles.repository'
+import { getArticle, getArticlesByDate, deleteArticle } from '@/db/repositories/articles.repository'
 import type { Article } from '@/db/schema/database'
 import ParagraphTranslation from './components/ParagraphTranslation.vue'
 import DrawingToolbar from './components/drawing/DrawingToolbar.vue'
+import ArticleDeleteConfirmModal from './components/ArticleDeleteConfirmModal.vue'
 import { useDrawingSession } from './composables/useDrawingSession'
+import { useArticleLongPress } from './composables/useArticleLongPress'
 import {
   ensureLocalDictionary,
   lookupLocalDictionary,
 } from '@/services/local-dictionary.service'
+import { articleGenerationService } from '@/services/article-generation.service'
 import { speakText } from '@/services/speech.service'
 
 import '@/styles/pages/article-read-page.css'
@@ -31,11 +34,15 @@ const emit = defineEmits<{
 
 const articles = ref<EnhancedArticle[]>([])
 const isLoading = ref(true)
-const isGenerating = ref(false)
+const generateError = ref('')
 const showDefinition = ref(false)
 const selectedWord = ref('')
 const wordDefinition = ref<any>(null)
 const isLoadingDefinition = ref(false)
+const isDeleting = ref(false)
+let pageAlive = true
+
+const isGenerating = computed(() => articleGenerationService.isGenerating.value)
 
 const {
   isActive: isDrawingMode,
@@ -49,16 +56,37 @@ const {
   setWidth: setDrawingWidth
 } = useDrawingSession()
 
+const {
+  pendingId: pendingDeleteId,
+  onPointerDown: onArticlePointerDown,
+  onPointerMove: onArticlePointerMove,
+  onPointerUp: onArticlePointerUp,
+  onContextMenu: onArticleContextMenu,
+  close: closeDeleteConfirm,
+} = useArticleLongPress(() => isDrawingMode.value || isGenerating.value || isDeleting.value)
+
+const pendingDeleteArticle = computed(
+  () => articles.value.find((article) => article.id === pendingDeleteId.value) ?? null,
+)
+
 onMounted(async () => {
   await loadArticle()
+})
+
+onUnmounted(() => {
+  pageAlive = false
 })
 
 async function loadArticle() {
   try {
     const data = await getArticle(props.articleId)
-    if (data) {
-      articles.value = [data]
-    }
+    if (!data) return
+
+    const sameDay = await getArticlesByDate(data.date)
+    const list = (sameDay.length > 0 ? sameDay : [data])
+      .slice()
+      .sort((a, b) => b.createdAt - a.createdAt)
+    articles.value = list
   } catch (error) {
     console.error('Failed to load article:', error)
   } finally {
@@ -68,50 +96,59 @@ async function loadArticle() {
 
 async function regenerateArticle() {
   if (isGenerating.value || articles.value.length === 0) return
-  
-  isGenerating.value = true
-  
-  try {
-    const originalArticle = articles.value[articles.value.length - 1]
-    const words = originalArticle.words || []
-    
-    // 🔧 测试模式：生成模拟文章，不调用 API（节省 token）
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    const articleTitle = `测试文章 - ${new Date().toLocaleTimeString('zh-CN')}`
-    const articleBody = `<p>This is a <mark>test</mark> paragraph with some vocabulary words. The purpose of this demo is to verify the regeneration functionality without consuming API tokens.</p>
 
-<p>Another paragraph here. We can include more <mark>words</mark> from the vocabulary list to make it look realistic. This helps us test the layout and interaction before enabling the real API calls.</p>
+  const source =
+    articles.value.find((article) => article.id === props.articleId) ??
+    articles.value[articles.value.length - 1]
+  const words = Array.from(source.words ?? [], (word) => String(word))
+  if (!words.length) {
+    generateError.value = '当前文章没有可用于生成的词汇'
+    return
+  }
 
-<p>A third paragraph to demonstrate multiple sections. The <mark>article</mark> should display properly with all the styling and features we've implemented.</p>`
-    
-    const newArticle: EnhancedArticle = {
-      id: `article-${Date.now()}`,
-      title: articleTitle,
-      content: articleBody,
-      words: words,
-      date: new Date().toISOString().split('T')[0],
-      createdAt: Date.now(),
-      isNew: true
+  generateError.value = ''
+  const article = await articleGenerationService.start(words, {
+    session: 'none',
+    date: source.date,
+  })
+  if (!pageAlive) return
+
+  if (!article) {
+    if (articleGenerationService.status.value === 'error') {
+      generateError.value = articleGenerationService.lastError.value || '生成失败'
     }
-    
-    articles.value.unshift(newArticle)
-    
-    setTimeout(() => {
-      articles.value.forEach(article => {
-        if (article.id !== newArticle.id) {
-          article.isNew = false
-        }
-      })
-    }, 3000)
-    
-    await addArticle(newArticle)
-    
+    return
+  }
+
+  articles.value.unshift({ ...article, isNew: true })
+  window.setTimeout(() => {
+    if (!pageAlive) return
+    articles.value.forEach((item) => {
+      if (item.id !== article.id) item.isNew = false
+    })
+  }, 3000)
+}
+
+async function confirmDeleteArticle() {
+  const target = pendingDeleteArticle.value
+  if (!target || isDeleting.value) return
+
+  isDeleting.value = true
+  try {
+    articles.value = articles.value.filter((article) => article.id !== target.id)
+    closeDeleteConfirm()
+    await nextTick()
+    await deleteArticle(target.id)
+    articleGenerationService.removeFromSession(target.id)
+    if (articles.value.length === 0) {
+      emit('back')
+    }
   } catch (error) {
-    console.error('Failed to regenerate article:', error)
-    alert('生成失败：' + (error instanceof Error ? error.message : '未知错误'))
+    console.error('Failed to delete article:', error)
+    generateError.value = '删除失败，请重试'
+    closeDeleteConfirm()
   } finally {
-    isGenerating.value = false
+    isDeleting.value = false
   }
 }
 
@@ -259,23 +296,35 @@ function formatTime(timestamp: number) {
           <span>正在生成新文章...</span>
         </div>
 
+        <p v-if="generateError" class="article-inline-error">{{ generateError }}</p>
+
         <article 
           v-for="(article, index) in articles" 
           :key="article.id" 
           class="article-read-body"
           :class="{ 'is-new': article.isNew }"
         >
-          <div v-if="articles.length > 1" class="article-meta">
-            <span v-if="article.isNew" class="article-badge article-badge--new">
-              <Sparkles :size="14" />
-              新生成
-            </span>
-            <span v-if="article.createdAt" class="article-timestamp">
-              {{ formatTime(article.createdAt) }}
-            </span>
-          </div>
+          <div
+            class="article-read-heading"
+            @pointerdown="onArticlePointerDown(article.id, $event)"
+            @pointermove="onArticlePointerMove"
+            @pointerup="onArticlePointerUp"
+            @pointercancel="onArticlePointerUp"
+            @pointerleave="onArticlePointerUp"
+            @contextmenu="onArticleContextMenu(article.id, $event)"
+          >
+            <div v-if="articles.length > 1" class="article-meta">
+              <span v-if="article.isNew" class="article-badge article-badge--new">
+                <Sparkles :size="14" />
+                新生成
+              </span>
+              <span v-if="article.createdAt" class="article-timestamp">
+                {{ formatTime(article.createdAt) }}
+              </span>
+            </div>
 
-          <h2 class="article-read-title">{{ article.title }}</h2>
+            <h2 class="article-read-title">{{ article.title }}</h2>
+          </div>
           
           <ParagraphTranslation 
             :article-id="article.id"
@@ -291,6 +340,13 @@ function formatTime(timestamp: number) {
         </article>
       </div>
     </main>
+
+    <ArticleDeleteConfirmModal
+      :show="!!pendingDeleteArticle"
+      :title="pendingDeleteArticle?.title ?? ''"
+      @close="closeDeleteConfirm"
+      @confirm="confirmDeleteArticle"
+    />
 
     <DrawingToolbar
       v-if="isDrawingMode"

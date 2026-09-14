@@ -206,14 +206,14 @@ const scoreStars = computed(() => {
 
 .translation-modal__header-content h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
   color: #1f2937;
 }
 
 .translation-modal__header-content p {
   margin: 4px 0 0 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: #6b7280;
 }
 
@@ -277,20 +277,20 @@ const scoreStars = computed(() => {
 }
 
 .translation-modal__score-number {
-  font-size: 42px;
+  font-size: 2.625rem;
   font-weight: 700;
   color: white;
   line-height: 1;
 }
 
 .translation-modal__score-total {
-  font-size: 18px;
+  font-size: 1.125rem;
   color: rgba(255, 255, 255, 0.9);
   margin-left: 2px;
 }
 
 .translation-modal__score-stars {
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 .translation-modal__section {
@@ -302,14 +302,14 @@ const scoreStars = computed(() => {
 
 .translation-modal__section h4 {
   margin: 0 0 12px 0;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
   color: #1f2937;
 }
 
 .translation-modal__section p {
   margin: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.6;
   color: #374151;
 }
@@ -326,7 +326,7 @@ const scoreStars = computed(() => {
   gap: 8px;
   padding: 10px 12px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .translation-modal__word-item--correct {
@@ -347,7 +347,7 @@ const scoreStars = computed(() => {
   height: 20px;
   border-radius: 50%;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .translation-modal__word-item--correct .translation-modal__word-icon {
@@ -369,7 +369,7 @@ const scoreStars = computed(() => {
 .translation-modal__word-suggestion {
   flex: 1;
   color: #6b7280;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .translation-modal__reference {
@@ -385,7 +385,7 @@ const scoreStars = computed(() => {
 
 .translation-modal__reference-label {
   margin-bottom: 6px;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--app-font-color-muted, #475569);
   text-transform: uppercase;
@@ -394,7 +394,7 @@ const scoreStars = computed(() => {
 
 .translation-modal__reference p {
   margin: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.6;
   color: #374151;
 }
@@ -404,7 +404,7 @@ const scoreStars = computed(() => {
 }
 
 .translation-modal__section summary {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--app-font-color-muted, #475569);
   user-select: none;
@@ -430,13 +430,13 @@ const scoreStars = computed(() => {
 .translation-modal__comparison-item strong {
   display: block;
   margin-bottom: 6px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--app-font-color-muted, #475569);
 }
 
 .translation-modal__comparison-item p {
   margin: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.6;
   color: #374151;
 }
@@ -458,7 +458,7 @@ const scoreStars = computed(() => {
   }
 
   .translation-modal__score-number {
-    font-size: 36px;
+    font-size: 2.25rem;
   }
 }
 </style>

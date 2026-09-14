@@ -44,7 +44,7 @@ onMounted(async () => {
 
   unsubscribeArticleGen = articleGenerationService.subscribe((event) => {
     // 只在不在文章页时弹全局提醒，避免重复打扰
-    if (activeView.value === 'article') return
+    if (activeView.value === 'article' || activeView.value === 'article-read') return
 
     if (event.status === 'success' && event.article) {
       showAppToast(`文章已生成：${event.article.title}`, event.article.id)
@@ -281,7 +281,7 @@ async function reloadProfileAfterRestore() {
 
 .app-toast__text {
   flex: 1;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.4;
 }
 
@@ -292,7 +292,7 @@ async function reloadProfileAfterRestore() {
   padding: 6px 12px;
   background: #38bdf8;
   color: #0f172a;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
 }

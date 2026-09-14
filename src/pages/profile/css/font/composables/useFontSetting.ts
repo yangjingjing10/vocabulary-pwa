@@ -15,6 +15,9 @@ import {
 import { fontService } from '@/services/font.service'
 import {
   DEFAULT_FONT_COLOR,
+  DEFAULT_FONT_SIZE,
+  MAX_FONT_SIZE,
+  MIN_FONT_SIZE,
   type FontDraft,
   type FontSource
 } from '../types/font'
@@ -22,12 +25,28 @@ import {
 const ALLOWED_EXTENSIONS = ['.ttf', '.otf', '.woff', '.woff2']
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
+function clampFontSize(size: number): number {
+  if (!Number.isFinite(size)) return DEFAULT_FONT_SIZE
+  return Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, Math.round(size)))
+}
+
 function createDefaultDraft(): FontDraft {
   return {
     source: null,
     fontFamily: '',
-    color: DEFAULT_FONT_COLOR
+    color: DEFAULT_FONT_COLOR,
+    fontSize: readInitialFontSize(),
   }
+}
+
+function readInitialFontSize(): number {
+  try {
+    const raw = localStorage.getItem('app_font_size')
+    if (raw != null) return clampFontSize(Number(raw))
+  } catch {
+    // ignore
+  }
+  return DEFAULT_FONT_SIZE
 }
 
 function sanitizeFontFamily(name: string): string {
@@ -97,7 +116,8 @@ export function useFontSetting() {
           fontAssetId: selected.fontAssetId,
           fileData: selected.fileData,
           url: selected.url,
-          color: selected.color ?? DEFAULT_FONT_COLOR
+          color: selected.color ?? DEFAULT_FONT_COLOR,
+          fontSize: clampFontSize(selected.fontSize ?? DEFAULT_FONT_SIZE),
         }
       }
     } catch (error) {
@@ -187,7 +207,10 @@ export function useFontSetting() {
     if (!draft.value.fontFamily || !src) return false
     const ok = await fontService.applyFontFamily(draft.value.fontFamily, src)
     if (ok) {
-      fontService.applyTypography(draft.value.color)
+      fontService.applyTypography({
+        color: draft.value.color,
+        fontSize: draft.value.fontSize,
+      })
     }
     return ok
   }
@@ -231,7 +254,10 @@ export function useFontSetting() {
         fileData,
         url: undefined
       }
-      fontService.applyTypography(draft.value.color)
+      fontService.applyTypography({
+        color: draft.value.color,
+        fontSize: draft.value.fontSize,
+      })
       showSuccess('字体已应用')
       return true
     } catch (error) {
@@ -282,7 +308,10 @@ export function useFontSetting() {
         url: trimmed,
         fileData: undefined
       }
-      fontService.applyTypography(draft.value.color)
+      fontService.applyTypography({
+        color: draft.value.color,
+        fontSize: draft.value.fontSize,
+      })
       showSuccess('字体已应用')
       return true
     } catch (error) {
@@ -330,7 +359,20 @@ export function useFontSetting() {
 
   async function setFontColor(color: string) {
     draft.value.color = color
-    fontService.applyTypography(color)
+    fontService.applyTypography({
+      color,
+      fontSize: draft.value.fontSize,
+    })
+    await persistActiveTypography()
+  }
+
+  async function setFontSize(size: number) {
+    const next = clampFontSize(size)
+    draft.value.fontSize = next
+    fontService.applyTypography({
+      color: draft.value.color,
+      fontSize: next,
+    })
     await persistActiveTypography()
   }
 
@@ -340,6 +382,7 @@ export function useFontSetting() {
     if (!config) return
 
     config.color = draft.value.color
+    config.fontSize = draft.value.fontSize
     config.updatedAt = Date.now()
     try {
       await saveFontConfig(config)
@@ -385,6 +428,7 @@ export function useFontSetting() {
         fileData: draft.value.fileData,
         url: draft.value.url,
         color: draft.value.color,
+        fontSize: draft.value.fontSize,
         isSelected: true,
         createdAt: now,
         updatedAt: now
@@ -445,6 +489,7 @@ export function useFontSetting() {
         fileData: draft.value.fileData,
         url: draft.value.url,
         color: draft.value.color,
+        fontSize: draft.value.fontSize,
         isSelected: true,
         updatedAt: Date.now()
       }
@@ -506,7 +551,8 @@ export function useFontSetting() {
         fontAssetId: config.fontAssetId,
         fileData: config.fileData,
         url: config.url,
-        color: config.color ?? DEFAULT_FONT_COLOR
+        color: config.color ?? DEFAULT_FONT_COLOR,
+        fontSize: clampFontSize(config.fontSize ?? DEFAULT_FONT_SIZE),
       }
 
       showSuccess(`已载入「${config.name}」，可修改后点更新`)
@@ -584,6 +630,7 @@ export function useFontSetting() {
     importFontFromUrl,
     selectFontAsset,
     setFontColor,
+    setFontSize,
     saveNamedConfig,
     updateExistingConfig,
     applyConfig,

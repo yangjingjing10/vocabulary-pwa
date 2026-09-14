@@ -49,7 +49,7 @@ export function useWeekNavigation() {
   // 获取周的起始日期
   function getWeekStartDate(year: number, month: number, weekNum: number): Date {
     const startDay = (weekNum - 1) * 7 + 1
-    return new Date(year, month - 1, startDay)
+    return new Date(year, month - 1, startDay, 12, 0, 0, 0)
   }
 
   // 上一周

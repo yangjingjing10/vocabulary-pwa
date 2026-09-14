@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { getWordsByDate } from '@/db/repositories/words.repository'
+import { todayLocalDate } from '@/utils/localDate'
 
 export interface CarouselWord {
   word: string
@@ -40,10 +41,10 @@ let ignoreMouseUntil = 0
 const cardCount = computed(() => words.value.length)
 
 const activeDate = computed(
-  () => props.date || new Date().toISOString().split('T')[0],
+  () => props.date || todayLocalDate(),
 )
 
-const isToday = computed(() => activeDate.value === new Date().toISOString().split('T')[0])
+const isToday = computed(() => activeDate.value === todayLocalDate())
 
 const currentWord = computed(() => words.value[currentIndex.value] ?? null)
 
@@ -296,14 +297,14 @@ defineExpose({
 
 .word-strip__empty-title {
   margin: 0 0 6px;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 650;
   color: var(--app-font-color-muted, #64748b);
 }
 
 .word-strip__empty-hint {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .word-strip__scene {
@@ -370,7 +371,7 @@ defineExpose({
 
 .word-strip__word {
   max-width: 100%;
-  font-size: clamp(28px, 7vw, 42px);
+  font-size: clamp(1.75rem, 7vw, 2.625rem);
   font-weight: 800;
   letter-spacing: -1px;
   line-height: 1.1;
@@ -380,13 +381,13 @@ defineExpose({
 }
 
 .word-strip__item.is-center .word-strip__word {
-  font-size: clamp(44px, 11vw, 64px);
+  font-size: clamp(2.75rem, 11vw, 4rem);
   color: var(--app-font-color, #0f172a);
 }
 
 .word-strip__phonetic {
   margin-top: 8px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--app-font-color-soft, #94a3b8);
 }
 
@@ -408,7 +409,7 @@ defineExpose({
 
 .word-strip__meaning-text {
   margin: 0;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1.45;
   color: var(--app-font-color, #0f172a);
@@ -416,13 +417,13 @@ defineExpose({
 
 .word-strip__meaning-empty {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--app-font-color-soft, #94a3b8);
 }
 
 .word-strip__meta {
   margin: 14px 0 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--app-font-color-soft, #94a3b8);
   opacity: 0.85;
 }

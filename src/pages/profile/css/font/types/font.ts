@@ -27,7 +27,7 @@ export interface FontConfig {
   fileData?: string
   /** 链接字体地址 */
   url?: string
-  /** @deprecated 字号已跟随系统设置，保留字段仅兼容旧数据 */
+  /** 全局字号（px，作为 html rem 根字号） */
   fontSize?: number
   /** 全局字体颜色（正文 + 顶栏 / 底栏） */
   color?: string
@@ -51,6 +51,10 @@ export interface FontDraft {
   fileData?: string
   url?: string
   color: string
+  fontSize: number
 }
 
 export const DEFAULT_FONT_COLOR = 'rgba(15, 23, 42, 1)'
+export const DEFAULT_FONT_SIZE = 16
+export const MIN_FONT_SIZE = 12
+export const MAX_FONT_SIZE = 22

@@ -1,7 +1,13 @@
 import { getCurrentFontConfig, type FontConfig } from '@/db/repositories/font.repository'
-import { DEFAULT_FONT_COLOR } from '@/pages/profile/css/font/types/font'
+import {
+  DEFAULT_FONT_COLOR,
+  DEFAULT_FONT_SIZE,
+  MAX_FONT_SIZE,
+  MIN_FONT_SIZE,
+} from '@/pages/profile/css/font/types/font'
 
 const STYLE_ELEMENT_ID = 'app-custom-font-face'
+const FONT_SIZE_STORAGE_KEY = 'app_font_size'
 
 /** 根据来源推断 @font-face format */
 function resolveFontFormat(sourceUrl: string): string {
@@ -13,15 +19,52 @@ function resolveFontFormat(sourceUrl: string): string {
   return 'truetype'
 }
 
+function clampFontSize(size: number): number {
+  if (!Number.isFinite(size)) return DEFAULT_FONT_SIZE
+  return Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, Math.round(size)))
+}
+
+function readStoredFontSize(): number | null {
+  try {
+    const raw = localStorage.getItem(FONT_SIZE_STORAGE_KEY)
+    if (!raw) return null
+    return clampFontSize(Number(raw))
+  } catch {
+    return null
+  }
+}
+
+function writeStoredFontSize(size: number) {
+  try {
+    localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(size))
+  } catch {
+    // ignore
+  }
+}
+
+function clearStoredFontSize() {
+  try {
+    localStorage.removeItem(FONT_SIZE_STORAGE_KEY)
+  } catch {
+    // ignore
+  }
+}
+
 class FontService {
   private currentConfig: FontConfig | null = null
 
-  /** 启动时恢复上次启用的字体配置 */
+  /** 启动时恢复上次启用的字体配置 / 字号 */
   async init() {
     try {
       const config = await getCurrentFontConfig()
       if (config) {
         await this.applyFontConfig(config)
+        return
+      }
+
+      const storedSize = readStoredFontSize()
+      if (storedSize != null) {
+        this.applyFontSize(storedSize)
       }
     } catch (error) {
       console.error('[FontService] init failed:', error)
@@ -29,8 +72,7 @@ class FontService {
   }
 
   /**
-   * 注入 @font-face，字体系列全局生效；
-   * 颜色作用于全局正文与顶栏 / 底栏；字号跟随系统设置
+   * 注入 @font-face，字体系列 / 颜色 / 字号全局生效
    */
   async applyFontConfig(config: FontConfig): Promise<boolean> {
     const src = config.source === 'file' ? config.fileData : config.url
@@ -51,14 +93,26 @@ class FontService {
   }
 
   /**
-   * 更新全局字体颜色（含顶栏 / 底栏；不改字号，跟随系统）
+   * 更新全局字体颜色 / 字号（含顶栏 / 底栏）
    */
-  applyTypography(color?: string) {
+  applyTypography(options?: { color?: string; fontSize?: number }) {
     const root = document.documentElement
-    if (color != null) {
-      this.applyFontColor(color)
+    if (options?.color != null) {
+      this.applyFontColor(options.color)
+    }
+    if (options?.fontSize != null) {
+      this.applyFontSize(options.fontSize)
     }
     root.classList.add('app-chrome-font-custom')
+  }
+
+  /** 全局字号：写入 CSS 变量并作为 html rem 根字号 */
+  applyFontSize(size: number) {
+    const next = clampFontSize(size)
+    const root = document.documentElement
+    root.style.setProperty('--app-font-size', `${next}px`)
+    root.style.fontSize = `${next}px`
+    writeStoredFontSize(next)
   }
 
   /** 同步写入全局正文色与 chrome 色 */
@@ -97,12 +151,12 @@ class FontService {
     root.style.removeProperty('--app-font-family')
     root.style.removeProperty('--app-chrome-font-size')
     root.style.removeProperty('--app-chrome-font-color')
-    // 兼容清理旧版误写到根节点的样式
     root.style.removeProperty('--app-font-size')
     root.style.removeProperty('--app-font-color')
     root.style.removeProperty('font-family')
     root.style.removeProperty('font-size')
     root.style.removeProperty('color')
+    clearStoredFontSize()
   }
 
   getCurrentConfig() {
@@ -112,17 +166,16 @@ class FontService {
   private applyRootStyles(config: FontConfig) {
     const root = document.documentElement
     const color = config.color ?? DEFAULT_FONT_COLOR
+    const fontSize = clampFontSize(
+      config.fontSize ?? readStoredFontSize() ?? DEFAULT_FONT_SIZE,
+    )
 
     root.style.setProperty('--app-font-family', `"${config.fontFamily}", sans-serif`)
     this.applyFontColor(color)
+    this.applyFontSize(fontSize)
     root.style.fontFamily = `"${config.fontFamily}", sans-serif`
     root.classList.add('app-chrome-font-custom')
-
-    // 字号跟随系统：清除旧版自定义字号 / 误写到根节点的 color
-    root.style.removeProperty('--app-chrome-font-size')
-    root.style.removeProperty('font-size')
     root.style.removeProperty('color')
-    root.style.removeProperty('--app-font-size')
   }
 
   /** 动态注入 @font-face，并用 FontFace API 预加载校验 */

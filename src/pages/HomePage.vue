@@ -5,10 +5,11 @@ import BottomNavigation from '@/components/navigation/BottomNavigation.vue'
 import TodayWordCarousel from '@/pages/home/components/TodayWordCarousel.vue'
 import HomeOrbitNav from '@/pages/home/components/HomeOrbitNav.vue'
 import HomeWeekTimeline from '@/pages/home/components/HomeWeekTimeline.vue'
+import { todayLocalDate } from '@/utils/localDate'
 
 import '@/styles/pages/home-page.css'
 
-const selectedDate = ref(new Date().toISOString().split('T')[0])
+const selectedDate = ref(todayLocalDate())
 
 defineProps<{
   activeTab: 'study' | 'home'

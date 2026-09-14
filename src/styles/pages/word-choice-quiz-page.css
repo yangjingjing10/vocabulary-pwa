@@ -41,7 +41,7 @@
 
 .choice-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--app-font-color, #0f172a);
@@ -82,13 +82,13 @@
 
 .choice-loading p {
   margin: 0;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--app-font-color, #0f172a);
 }
 
 .choice-loading__hint {
-  font-size: 13px !important;
+  font-size: 0.8125rem !important;
   font-weight: 400 !important;
   color: var(--app-font-color-soft, #94a3b8) !important;
 }
@@ -117,14 +117,14 @@
 
 .choice-error__title {
   margin: 0 0 10px;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 700;
   color: #dc2626;
 }
 
 .choice-error__message {
   margin: 0 0 20px;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.6;
   color: var(--app-font-color-muted, #64748b);
 }
@@ -140,7 +140,7 @@
 
 .choice-error__hint p {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: #b45309;
 }
@@ -148,7 +148,7 @@
 .choice-error__hint ol {
   margin: 0;
   padding-left: 18px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: #92400e;
 }
 
@@ -163,7 +163,7 @@
   border-radius: 12px;
   background: #0f172a;
   color: #fff;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.15s ease;
@@ -209,7 +209,7 @@
   min-height: 44px;
   padding: 0 16px;
   border-radius: 12px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
@@ -253,7 +253,7 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .choice-progress__text {
@@ -263,7 +263,7 @@
 
 .choice-progress__answered {
   color: var(--app-font-color-soft, #94a3b8);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .choice-progress__bar {
@@ -292,7 +292,7 @@
 
 .choice-question__text {
   margin: 0 0 20px;
-  font-size: 17px;
+  font-size: 1.0625rem;
   line-height: 1.65;
   color: var(--app-font-color, #0f172a);
   font-weight: 600;
@@ -339,7 +339,7 @@
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 50%;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--app-font-color-muted, #64748b);
   transition: all 0.2s ease;
 }
@@ -352,7 +352,7 @@
 
 .choice-option__text {
   flex: 1;
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.45;
   color: var(--app-font-color, #334155);
   font-weight: 500;
@@ -382,7 +382,7 @@
 
 .choice-result__title {
   margin: 0 0 20px;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
   color: var(--app-font-color, #0f172a);
   letter-spacing: 0.04em;
@@ -419,7 +419,7 @@
 }
 
 .choice-result__stat-label {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--app-font-color-soft, #94a3b8);
   font-weight: 500;
 }
@@ -434,7 +434,7 @@
 
 .choice-result__details-title {
   margin: 0 0 14px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--app-font-color-muted, #475569);
 }
@@ -489,14 +489,14 @@
 }
 
 .choice-result__item-number {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--app-font-color-soft, #94a3b8);
   flex-shrink: 0;
 }
 
 .choice-result__item-word {
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--app-font-color, #0f172a);
 }
@@ -507,7 +507,7 @@
 
 .choice-result__item-question {
   margin: 0 0 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.55;
   color: var(--app-font-color-muted, #64748b);
 }
@@ -523,7 +523,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .choice-result__answer-label {
@@ -549,7 +549,7 @@
 
 .choice-result__item-explanation {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.55;
   color: var(--app-font-color-muted, #64748b);
   padding: 10px 12px;
@@ -575,7 +575,7 @@
   gap: 8px;
   height: 48px;
   border-radius: 14px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.15s ease;
@@ -613,7 +613,7 @@
   }
 
   .choice-question__text {
-    font-size: 16px;
+    font-size: 1rem;
   }
 
   .choice-quiz {

@@ -97,14 +97,14 @@
 
 .css-category-item__content h3 {
   margin: 0 0 4px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   color: var(--app-font-color, #0f172a);
 }
 
 .css-category-item__content p {
   margin: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--app-font-color-soft, #94a3b8);
   line-height: 1.4;
 }
@@ -191,7 +191,7 @@
 .wallpaper-control-row__label {
   flex-shrink: 0;
   width: 56px;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--app-font-color-muted, #64748b);
 }
@@ -271,14 +271,14 @@
   flex-shrink: 0;
   min-width: 52px;
   text-align: right;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--app-font-color-muted, #64748b);
 }
 
 .wallpaper-controls__hint {
   margin: 0;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--app-font-color-soft, #94a3b8);
 }
 
@@ -304,14 +304,14 @@
 
 .wallpaper-empty__text {
   margin: 0 0 8px;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--app-font-color-muted, #64748b);
 }
 
 .wallpaper-empty__hint {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--app-font-color-soft, #94a3b8);
 }
 
@@ -400,7 +400,7 @@
 }
 
 .wallpaper-card__name {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--app-font-color, #0f172a);
   display: block;
@@ -420,13 +420,13 @@
 
 .wallpaper-url-import__title {
   margin: 0 0 4px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 750;
 }
 
 .wallpaper-url-import__desc {
   margin: 0 0 12px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--app-font-color-soft, #94a3b8);
 }
 
@@ -444,7 +444,7 @@
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.55);
   color: var(--app-font-color, #0f172a);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .wallpaper-url-import__btn,
@@ -459,7 +459,7 @@
   border-radius: 10px;
   background: #334155;
   color: #fff;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 650;
   cursor: pointer;
   white-space: nowrap;
@@ -473,7 +473,7 @@
 
 .wallpaper-url-import__error {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.4;
   color: #b91c1c;
 }
@@ -560,7 +560,7 @@
   padding: 8px 12px;
   border: 0;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -664,7 +664,7 @@
   margin-bottom: 16px;
   padding: 10px 14px;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 
@@ -734,7 +734,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--app-font-color, #0f172a);
   outline: none;
   cursor: pointer;
@@ -772,20 +772,20 @@
 
 .font-section__title {
   margin: 0 0 4px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   color: var(--app-font-color, #0f172a);
 }
 
 .font-section__value {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--app-font-color-muted, #64748b);
 }
 
 .font-section__desc {
   margin: 0 0 12px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--app-font-color-soft, #94a3b8);
   line-height: 1.4;
 }
@@ -808,7 +808,7 @@
   border-radius: 14px;
   background: rgba(248, 250, 252, 0.7);
   color: var(--app-font-color-muted, #64748b);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   text-align: center;
   cursor: pointer;
@@ -844,7 +844,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--app-font-color, #0f172a);
   outline: none;
   transition: border-color 0.2s ease;
@@ -869,7 +869,7 @@
   border-radius: 10px;
   background: #334155;
   color: #fff;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease;
@@ -949,7 +949,7 @@
 
 .font-opacity-row__label {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--app-font-color-muted, #64748b);
   font-weight: 600;
 }
@@ -962,15 +962,61 @@
   flex-shrink: 0;
   min-width: 40px;
   text-align: right;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--app-font-color-muted, #64748b);
+}
+
+.font-size-setting {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.font-size-setting__left {
+  flex: 1;
+  min-width: 0;
+}
+
+.font-size-setting__value {
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--app-font-color-muted, #64748b);
+}
+
+.font-size-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.font-size-row .font-range {
+  flex: 1;
+}
+
+.font-size-row__label {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--app-font-color-muted, #64748b);
+  line-height: 1;
+}
+
+.font-size-row__label--sm {
+  font-size: 0.75rem;
+}
+
+.font-size-row__label--lg {
+  font-size: 1.125rem;
 }
 
 .font-empty {
   padding: 20px;
   text-align: center;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--app-font-color-soft, #94a3b8);
   background: #f8fafc;
   border-radius: 12px;
@@ -1032,7 +1078,7 @@
 }
 
 .font-config-item__info strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   color: var(--app-font-color, #0f172a);
   white-space: nowrap;
@@ -1041,7 +1087,7 @@
 }
 
 .font-config-item__info span {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--app-font-color-soft, #94a3b8);
   white-space: nowrap;
   overflow: hidden;

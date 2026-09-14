@@ -62,7 +62,7 @@
 }
 
 .api-settings-header h1 {
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.4;
   font-weight: 800;
 }
@@ -70,7 +70,7 @@
 .api-settings-header p {
   margin-top: 2px;
   color: var(--api-muted);
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 
 .api-icon-button {
@@ -93,7 +93,7 @@
   border-radius: 999px;
   background: #fffbeb;
   color: #d97706;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
 }
 
@@ -127,7 +127,7 @@
 
 .api-section__label {
   color: var(--app-font-color-soft, #94a3b8);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 800;
 }
 
@@ -147,7 +147,7 @@
   border-radius: 16px;
   background: transparent;
   color: var(--app-font-color-muted, #475569);
-  font-size: 10px;
+  font-size: 0.625rem;
   cursor: pointer;
 }
 
@@ -166,7 +166,7 @@
   border-radius: 8px;
   background: var(--api-primary-soft);
   color: var(--api-primary);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 800;
 }
 
@@ -212,7 +212,7 @@
 
 .api-card__heading h2,
 .api-test-card h2 {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 800;
 }
 
@@ -220,7 +220,7 @@
 .api-test-card p {
   margin-top: 3px;
   color: var(--api-muted);
-  font-size: 9px;
+  font-size: 0.5625rem;
 }
 
 .api-card__heading > span {
@@ -229,7 +229,7 @@
   border-radius: 999px;
   background: var(--api-primary-soft);
   color: var(--api-primary);
-  font-size: 9px;
+  font-size: 0.5625rem;
   font-weight: 700;
 }
 
@@ -237,7 +237,7 @@
   display: grid;
   gap: 6px;
   color: var(--app-font-color-muted, #475569);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
 }
 
@@ -252,7 +252,7 @@
   border: 0;
   background: none;
   color: var(--api-primary);
-  font-size: 9px;
+  font-size: 0.5625rem;
   cursor: pointer;
 }
 
@@ -269,7 +269,7 @@
   color: var(--app-font-color, #1e293b);
   font: inherit;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .api-field input:focus,
@@ -321,7 +321,7 @@
   gap: 5px;
   margin: -4px 0 0;
   color: #d97706;
-  font-size: 9px;
+  font-size: 0.5625rem;
   font-weight: 700;
 }
 
@@ -344,13 +344,13 @@
 }
 
 .api-toggle-row strong {
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .api-toggle-row div > span {
   margin-top: 3px;
   color: var(--api-muted);
-  font-size: 9px;
+  font-size: 0.5625rem;
 }
 
 .api-toggle {
@@ -410,7 +410,7 @@
   border-radius: 12px;
   background: var(--api-primary);
   color: #fff;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 800;
   cursor: pointer;
 }
@@ -453,7 +453,7 @@
   transform: translateX(-50%);
   background: rgba(15, 23, 42, 0.94);
   color: #fff;
-  font-size: 11px;
+  font-size: 0.6875rem;
   box-shadow: 0 14px 32px rgba(15, 23, 42, 0.22);
 }
 
@@ -490,12 +490,12 @@
   }
 
   .api-settings-header h1 {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
 
   .api-connection-status {
     padding: 5px 7px;
-    font-size: 9px;
+    font-size: 0.5625rem;
   }
 
   .api-provider-grid {
@@ -503,7 +503,7 @@
   }
 
   .api-provider {
-    font-size: 9px;
+    font-size: 0.5625rem;
   }
 }
 
@@ -519,7 +519,7 @@
 .api-section__desc {
   margin-top: 3px;
   color: var(--api-muted);
-  font-size: 9px;
+  font-size: 0.5625rem;
   font-weight: 400;
 }
 
@@ -532,7 +532,7 @@
   border-radius: 10px;
   background: transparent;
   color: var(--api-primary);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   cursor: pointer;
   flex-shrink: 0;
@@ -557,12 +557,12 @@
 
 .api-empty-state p {
   margin: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
 .api-empty-state span {
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 
 .api-dict-card {
@@ -592,7 +592,7 @@
 }
 
 .api-dict-card__title strong {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 800;
 }
 
@@ -601,7 +601,7 @@
   border-radius: 6px;
   background: #f1f5f9;
   color: var(--app-font-color-muted, #64748b);
-  font-size: 9px;
+  font-size: 0.5625rem;
   font-weight: 700;
 }
 
@@ -655,7 +655,7 @@
   border-radius: 10px;
   background: transparent;
   color: var(--app-font-color-muted, #475569);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -684,7 +684,7 @@
   border-radius: 10px;
   background: var(--api-primary-soft);
   color: var(--api-primary);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   cursor: pointer;
 }

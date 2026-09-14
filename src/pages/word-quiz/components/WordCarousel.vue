@@ -60,7 +60,7 @@ const current = computed(() => props.words[props.currentIndex] ?? null)
 }
 
 .quiz-word-prompt__word {
-  font-size: clamp(42px, 11vw, 68px);
+  font-size: clamp(2.625rem, 11vw, 4.25rem);
   font-weight: 800;
   letter-spacing: -1.5px;
   color: #ffffff;
@@ -69,7 +69,7 @@ const current = computed(() => props.words[props.currentIndex] ?? null)
 }
 
 .quiz-word-prompt__word.is-chinese {
-  font-size: clamp(28px, 7.5vw, 44px);
+  font-size: clamp(1.75rem, 7.5vw, 2.75rem);
   font-weight: 700;
   letter-spacing: 0.06em;
   line-height: 1.35;
@@ -77,7 +77,7 @@ const current = computed(() => props.words[props.currentIndex] ?? null)
 
 .quiz-word-prompt__phonetic {
   margin-top: 10px;
-  font-size: 16px;
+  font-size: 1rem;
   color: rgba(255, 255, 255, 0.5);
 }
 </style>

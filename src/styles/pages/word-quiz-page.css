@@ -92,7 +92,7 @@
   align-self: center;
   margin-top: 8px;
   padding: 6px 14px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   color: rgba(255, 255, 255, 0.7);
@@ -123,7 +123,7 @@
   align-items: center;
   gap: 6px;
   width: 100%;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: rgba(255, 255, 255, 0.65);
   background: transparent;
   border: none;
@@ -172,7 +172,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: rgba(255, 255, 255, 0.55);
   padding: 8px 0;
 }
@@ -182,7 +182,7 @@
 }
 
 .example-panel__item {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: rgba(255, 255, 255, 0.72);
   line-height: 1.5;
   margin-bottom: 12px;
@@ -203,13 +203,13 @@
 
 .example-panel__translation {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: rgba(255, 255, 255, 0.5);
 }
 
 .example-panel__source {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.38);
   font-style: italic;
 }
@@ -225,7 +225,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 13px;
+  font-size: 0.8125rem;
   cursor: pointer;
   transition: background 0.2s ease;
 }
@@ -265,7 +265,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
   padding: 0 20px;
-  font-size: 17px;
+  font-size: 1.0625rem;
   color: #ffffff;
   outline: none;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
@@ -345,11 +345,23 @@
 }
 
 .quiz-results__header h2 {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.85);
-  margin: 0 0 20px 0;
+  margin: 0 0 8px 0;
   letter-spacing: 0.04em;
+}
+
+.quiz-results__partial-hint {
+  margin: 0 0 16px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.quiz-results__partial-hint strong {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 700;
 }
 
 .quiz-results__score {
@@ -398,7 +410,7 @@
 }
 
 .quiz-results__stat-label {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.45);
   font-weight: 500;
 }
@@ -417,7 +429,7 @@
 }
 
 .quiz-results__errors h3 {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.75);
   margin: 0 0 14px 0;
@@ -481,7 +493,7 @@
 
 .quiz-results__button {
   height: 48px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
   border-radius: 14px;
   cursor: pointer;

@@ -60,7 +60,7 @@
 }
 
 .import-header__title h1 {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 800;
   line-height: 1.3;
 }
@@ -68,7 +68,7 @@
 .import-header__title p {
   margin-top: 2px;
   color: var(--import-muted);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .import-content {
@@ -108,7 +108,7 @@
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.72);
   color: var(--import-primary);
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease;
@@ -126,7 +126,7 @@
 .import-hint {
   margin: 0;
   color: var(--import-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .import-text-button {
@@ -135,7 +135,7 @@
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.8);
   color: var(--app-font-color-muted, #475569);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -165,7 +165,7 @@
   border-radius: 8px;
   background: transparent;
   color: var(--app-font-color-muted, #64748b);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
@@ -192,7 +192,7 @@
   background: rgba(255, 255, 255, 0.82);
   color: var(--import-text);
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
   resize: vertical;
 }
@@ -219,7 +219,7 @@
   border-radius: 14px;
   background: #0f172a;
   color: #fff;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
   transition: opacity 0.2s ease, background 0.15s ease;
@@ -258,7 +258,7 @@
 }
 
 .import-words__header strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .import-words__header button {
@@ -267,7 +267,7 @@
   border-radius: 8px;
   background: #fef2f2;
   color: #dc2626;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -287,7 +287,7 @@
   border-radius: 10px;
   background: #f1f5f9;
   color: var(--app-font-color, #334155);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 
@@ -327,7 +327,7 @@
   border-radius: 14px;
   background: #0f172a;
   color: #fff;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 800;
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
@@ -343,7 +343,7 @@
   transform: translateX(-50%);
   background: rgba(15, 23, 42, 0.92);
   color: #fff;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
 }
@@ -368,7 +368,7 @@
   gap: 12px;
   background: rgba(0, 0, 0, 0.4);
   color: #fff;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   text-align: center;
 }

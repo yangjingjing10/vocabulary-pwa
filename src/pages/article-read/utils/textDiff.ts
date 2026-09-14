@@ -65,38 +65,3 @@ function mergeAdjacent(parts: DiffPart[]): DiffPart[] {
   }
   return result
 }
-
-/** 测试用：不调用 AI，对用户译文做可感知的润色改写 */
-export function mockAiRevision(userTranslation: string, _paragraphIndex: number): string {
-  const text = userTranslation.trim()
-  if (!text) return ''
-
-  let revised = text
-    .replace(/非常/g, '十分')
-    .replace(/很多/g, '许多')
-    .replace(/觉得/g, '感到')
-    .replace(/好像/g, '仿佛')
-    .replace(/看见/g, '看到')
-    .replace(/美丽/g, '秀美')
-    .replace(/漂亮/g, '精致')
-    .replace(/昨天/g, '昨日')
-    .replace(/今天/g, '今日')
-    .replace(/开心/g, '愉悦')
-    .replace(/安静/g, '静谧')
-    .replace(/花园/g, '庭园')
-    .replace(/房子/g, '住所')
-    .replace(/玩耍/g, '嬉戏')
-    .replace(/跑来跑去/g, '四处奔跑')
-    .replace(/繁忙/g, '喧嚣')
-
-  if (revised === text) {
-    const body = text.replace(/[。！？]*$/, '')
-    revised = `${body}，读来更为顺畅。`
-  }
-
-  if (revised === text) {
-    revised = `${text.replace(/[。！？]*$/, '')}——略作润色。`
-  }
-
-  return revised
-}

@@ -7,6 +7,7 @@ import FontLibrarySelect from './components/FontLibrarySelect.vue'
 import FontUpload from './components/FontUpload.vue'
 import FontUrlImport from './components/FontUrlImport.vue'
 import FontColorSetting from './components/FontColorSetting.vue'
+import FontSizeSetting from './components/FontSizeSetting.vue'
 import FontConfigList from './components/FontConfigList.vue'
 import FontConfigSave from './components/FontConfigSave.vue'
 
@@ -32,6 +33,7 @@ const {
   importFontFromUrl,
   selectFontAsset,
   setFontColor,
+  setFontSize,
   saveNamedConfig,
   updateExistingConfig,
   applyConfig,
@@ -41,6 +43,10 @@ const {
 
 async function handleFontColor(value: string) {
   await setFontColor(value)
+}
+
+async function handleFontSize(value: number) {
+  await setFontSize(value)
 }
 </script>
 
@@ -68,6 +74,7 @@ async function handleFontColor(value: string) {
       <FontPreview
         :font-family="draft.fontFamily"
         :color="draft.color"
+        :font-size="draft.fontSize"
       />
       <FontLibrarySelect
         :assets="fontAssets"
@@ -77,6 +84,7 @@ async function handleFontColor(value: string) {
       />
       <FontUpload :loading="loading" @upload="uploadFontFile" />
       <FontUrlImport :loading="loading" @import="importFontFromUrl" />
+      <FontSizeSetting :model-value="draft.fontSize" @update:model-value="handleFontSize" />
       <FontColorSetting :model-value="draft.color" @update:model-value="handleFontColor" />
       <FontConfigSave
         :loading="loading"

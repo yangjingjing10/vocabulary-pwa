@@ -107,13 +107,13 @@ const annotationCount = computed(() => 0)
   border-radius: 12px;
   background: linear-gradient(135deg, #fef3c7, #fde68a);
   box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: #92400e;
 }
 
 .indicator-icon {
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 
 .close-button {
@@ -122,7 +122,7 @@ const annotationCount = computed(() => 0)
   border-radius: 6px;
   background: #fff;
   color: #92400e;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -150,12 +150,12 @@ const annotationCount = computed(() => 0)
 .toolbar-hint {
   margin: 0 0 8px;
   color: var(--app-font-color-muted, #64748b);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .toolbar-stats {
   color: var(--app-font-color-soft, #94a3b8);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .annotation-sidebar {
@@ -173,7 +173,7 @@ const annotationCount = computed(() => 0)
 
 .annotation-sidebar h3 {
   margin: 0 0 16px;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--app-font-color, #0f172a);
 }
@@ -181,7 +181,7 @@ const annotationCount = computed(() => 0)
 .empty-state {
   padding: 40px 20px;
   color: var(--app-font-color-soft, #94a3b8);
-  font-size: 14px;
+  font-size: 0.875rem;
   text-align: center;
 }
 

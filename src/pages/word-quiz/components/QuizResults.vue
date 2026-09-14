@@ -8,15 +8,23 @@ interface Props {
   skippedCount: number
   incorrectResults: QuizResult[]
   skippedResults: QuizResult[]
+  title?: string
+  isPartial?: boolean
+  remainingCount?: number
 }
 
 interface Emits {
   (e: 'retry'): void
+  (e: 'continueRemaining'): void
   (e: 'advancedPractice'): void
   (e: 'back'): void
 }
 
-defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  title: '测试完成',
+  isPartial: false,
+  remainingCount: 0,
+})
 const emit = defineEmits<Emits>()
 
 function meaningOf(result: QuizResult): string {
@@ -28,7 +36,10 @@ function meaningOf(result: QuizResult): string {
 <template>
   <div class="quiz-results">
     <div class="quiz-results__header">
-      <h2>测试完成</h2>
+      <h2>{{ title }}</h2>
+      <p v-if="isPartial && remainingCount > 0" class="quiz-results__partial-hint">
+        已检测 {{ results.length }} 题，还有 <strong>{{ remainingCount }}</strong> 个单词未测
+      </p>
       <div class="quiz-results__score">
         <div class="quiz-results__score-circle">
           <span class="quiz-results__score-number">{{ accuracy }}%</span>
@@ -38,7 +49,7 @@ function meaningOf(result: QuizResult): string {
 
     <div class="quiz-results__stats">
       <div class="quiz-results__stat">
-        <span class="quiz-results__stat-label">总题数</span>
+        <span class="quiz-results__stat-label">{{ isPartial ? '已测' : '总题数' }}</span>
         <span class="quiz-results__stat-value">{{ results.length }}</span>
       </div>
       <div class="quiz-results__stat">
@@ -105,11 +116,20 @@ function meaningOf(result: QuizResult): string {
 
     <div class="quiz-results__actions">
       <button
+        v-if="isPartial && remainingCount > 0"
         type="button"
         class="quiz-results__button quiz-results__button--solid"
+        @click="emit('continueRemaining')"
+      >
+        继续剩余 {{ remainingCount }} 个
+      </button>
+      <button
+        type="button"
+        class="quiz-results__button"
+        :class="isPartial && remainingCount > 0 ? 'quiz-results__button--ghost' : 'quiz-results__button--solid'"
         @click="emit('retry')"
       >
-        再测一次
+        {{ isPartial ? '重新全部测试' : '再测一次' }}
       </button>
       <button
         type="button"

@@ -23,6 +23,8 @@ export interface QuizWord {
 
 export interface QuizBatch {
   batchId: string
+  /** 所属学习日，用于按日期隔离续测进度 */
+  date?: string
   createdAt: number
   words: QuizWord[]
   status: 'ongoing' | 'paused' | 'finished'

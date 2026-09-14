@@ -324,14 +324,14 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
 
 .choice-record-page__title h1 {
   margin: 0;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 800;
   line-height: 1.3;
 }
 
 .choice-record-page__title p {
   margin: 2px 0 0;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--app-font-color-soft, #94a3b8);
 }
 
@@ -348,7 +348,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   border-radius: 999px;
   background: #334155;
   color: #fff;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -366,7 +366,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   padding: 0 4px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.2);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
 }
 
@@ -393,7 +393,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
 
 .choice-record-page__empty-title {
   margin: 0 0 8px;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 800;
   color: var(--app-font-color, #0f172a);
 }
@@ -401,7 +401,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
 .choice-record-page__empty-desc {
   margin: 0;
   max-width: 280px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.55;
   color: var(--app-font-color-soft, #94a3b8);
 }
@@ -409,7 +409,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
 .choice-record-page__batches h2,
 .choice-record-page__cards h2 {
   margin: 0 0 12px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 800;
   color: var(--app-font-color, #334155);
 }
@@ -444,19 +444,19 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
 }
 
 .choice-record-page__batch-main strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--app-font-color, #0f172a);
 }
 
 .choice-record-page__batch-main span {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--app-font-color-soft, #94a3b8);
 }
 
 .choice-record-page__batch-score {
   padding: 3px 8px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
@@ -506,7 +506,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
 }
 
 .choice-record-page__accuracy-label {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--app-font-color-soft, #94a3b8);
   font-weight: 600;
 }
@@ -534,7 +534,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
 }
 
 .choice-record-page__stat span {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--app-font-color-soft, #94a3b8);
   font-weight: 600;
 }
@@ -575,7 +575,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
 
 .choice-q-card__word {
   flex-shrink: 0;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 800;
   color: var(--app-font-color, #0f172a);
 }
@@ -586,7 +586,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--app-font-color-soft, #94a3b8);
 }
 
@@ -609,7 +609,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
 
 .choice-q-card__question {
   margin: 0 0 12px;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.55;
   color: var(--app-font-color, #334155);
   font-weight: 600;
@@ -623,7 +623,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
 }
 
 .choice-q-card__options-title {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--app-font-color-soft, #94a3b8);
   margin-bottom: 2px;
@@ -635,7 +635,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   border-radius: 10px;
   background: rgba(255, 251, 235, 0.45);
   border: 1px dashed rgba(253, 230, 138, 0.7);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.45;
   color: #92400e;
 }
@@ -648,7 +648,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   border-radius: 10px;
   background: transparent;
   border: 1px dashed rgba(148, 163, 184, 0.28);
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--app-font-color-muted, #475569);
 }
 
@@ -680,7 +680,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   place-items: center;
   border-radius: 50%;
   background: rgba(226, 232, 240, 0.65);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 700;
   color: var(--app-font-color-muted, #64748b);
 }
@@ -704,7 +704,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .choice-q-card__answers > div {
@@ -717,7 +717,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   flex-shrink: 0;
   min-width: 4.5em;
   color: var(--app-font-color-soft, #94a3b8);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -740,7 +740,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   border-radius: 10px;
   background: transparent;
   border: 1px dashed rgba(148, 163, 184, 0.3);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: var(--app-font-color-muted, #64748b);
 }

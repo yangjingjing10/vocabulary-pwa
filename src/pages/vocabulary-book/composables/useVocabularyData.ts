@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { addLocalDays, formatLocalDate, startOfLocalDay, todayLocalDate } from '@/utils/localDate'
 import { getAllWords } from '@/db/repositories/words.repository'
 import { getArticlesByDate } from '@/db/repositories/articles.repository'
 import { getTranslationRecordsByDate } from '@/db/repositories/translation-records.repository'
@@ -55,10 +56,9 @@ export function useVocabularyData() {
       const allWords = await getAllWords()
       const days: DayData[] = []
 
+      const weekStart = startOfLocalDay(weekStartDate)
       for (let i = 0; i < 7; i++) {
-        const date = new Date(weekStartDate)
-        date.setDate(weekStartDate.getDate() + i)
-
+        const date = addLocalDays(weekStart, i)
         const dayData = await loadDayData(date, allWords)
 
         if (dayData.hasWords || dayData.isToday) {
@@ -66,7 +66,11 @@ export function useVocabularyData() {
         }
       }
 
-      weekDays.value = days.reverse()
+      // 新的一天在前；始终展开今天（没词也展开）
+      const ordered = days.reverse()
+      const today = ordered.find((day) => day.isToday)
+      if (today) today.expanded = true
+      weekDays.value = ordered
     } catch (error) {
       console.error('Failed to load week data:', error)
     } finally {
@@ -75,10 +79,10 @@ export function useVocabularyData() {
   }
 
   async function loadDayData(date: Date, allWords: any[]): Promise<DayData> {
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = formatLocalDate(date)
     const dateFormatted = `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`
     const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()]
-    const isToday = dateStr === new Date().toISOString().split('T')[0]
+    const isToday = dateStr === todayLocalDate()
 
     const dayWords = allWords
       .filter((w) => w.date === dateStr)
@@ -116,7 +120,7 @@ export function useVocabularyData() {
       isToday,
       hasWords: dayWords.length > 0,
       source: dayWords.length > 0 ? `${dayWords.length} words` : '',
-      expanded: isToday && dayWords.length > 0,
+      expanded: false,
       words: dayWords,
       articleCount: dayArticles.length,
       translationRecords: dayTranslations,

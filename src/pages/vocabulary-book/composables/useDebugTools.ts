@@ -1,5 +1,6 @@
 import { addWord, getAllWords, deleteWord } from '@/db/repositories/words.repository'
 import { addArticle } from '@/db/repositories/articles.repository'
+import { todayLocalDate } from '@/utils/localDate'
 
 /**
  * 开发调试工具
@@ -14,7 +15,7 @@ export function useDebugTools() {
     }
     
     try {
-      const todayDate = new Date().toISOString().split('T')[0]
+      const todayDate = todayLocalDate()
       
       const testWords = [
         { word: 'apple', phonetic: '/ˈæpl/', pos: 'n.', translation: '苹果' },

@@ -145,7 +145,7 @@ const hasRemaining = computed(() => {
 
 .quiz-pause-panel__title {
   margin: 0;
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 600;
   color: #ffffff;
   letter-spacing: 0.02em;
@@ -182,12 +182,12 @@ const hasRemaining = computed(() => {
 }
 
 .quiz-pause-panel__stat-label {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.45);
 }
 
 .quiz-pause-panel__stat-value {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
   color: #ffffff;
 }
@@ -217,7 +217,7 @@ const hasRemaining = computed(() => {
 
 .quiz-pause-panel__hint p {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
 }
 
@@ -240,7 +240,7 @@ const hasRemaining = computed(() => {
   gap: 8px;
   height: 48px;
   border-radius: 14px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;

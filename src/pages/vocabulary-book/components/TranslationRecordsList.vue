@@ -73,7 +73,7 @@ function getScoreColor(score: number): string {
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 8px;
   color: var(--app-font-color-muted, #475569);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -98,7 +98,7 @@ function getScoreColor(score: number): string {
   min-width: 36px;
   padding: 2px 8px;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: white;
 }
@@ -121,6 +121,6 @@ function getScoreColor(score: number): string {
 
 .translation-record-item__arrow {
   color: var(--app-font-color-muted, #64748b);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 </style>

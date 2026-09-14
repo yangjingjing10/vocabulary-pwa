@@ -91,7 +91,7 @@ function onOpacityInput(event: Event) {
       <div class="font-color-setting__left">
         <h2 class="font-section__title">字体颜色</h2>
         <p class="font-section__desc font-section__desc--tight">
-          调整全局文字颜色与不透明度，便于适配壁纸（字号跟随系统）
+          调整全局文字颜色与不透明度，便于适配壁纸
         </p>
       </div>
 

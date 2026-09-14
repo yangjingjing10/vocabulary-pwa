@@ -95,7 +95,7 @@ defineExpose({ reload: refresh })
   border: 0;
   background: transparent;
   color: var(--app-font-color-muted, #64748b);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   cursor: pointer;

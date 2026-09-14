@@ -36,13 +36,13 @@
 
 .data-backup-page__title h1 {
   margin: 0;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 750;
 }
 
 .data-backup-page__title p {
   margin: 2px 0 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--app-font-color-soft, #94a3b8);
 }
 
@@ -64,13 +64,13 @@
 
 .data-backup-card h2 {
   margin: 0 0 8px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 750;
 }
 
 .data-backup-card__desc {
   margin: 0 0 14px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
   color: var(--app-font-color-muted, #64748b);
 }
@@ -92,12 +92,12 @@
 }
 
 .data-backup-summary__grid span {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--app-font-color-soft, #94a3b8);
 }
 
 .data-backup-summary__grid strong {
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 750;
   letter-spacing: -0.02em;
 }
@@ -114,7 +114,7 @@
   border-radius: 12px;
   background: #334155;
   color: #fff;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 650;
   cursor: pointer;
   transition: opacity 0.18s ease, transform 0.18s ease;
@@ -142,7 +142,7 @@
   margin: 0;
   padding: 10px 12px;
   border-radius: 12px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.45;
   background: rgba(241, 245, 249, 0.7);
   color: var(--app-font-color-muted, #64748b);

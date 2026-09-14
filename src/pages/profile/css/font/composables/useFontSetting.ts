@@ -18,6 +18,7 @@ import {
   DEFAULT_FONT_SIZE,
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
+  SYSTEM_FONT_ASSET_ID,
   type FontDraft,
   type FontSource
 } from '../types/font'
@@ -323,8 +324,12 @@ export function useFontSetting() {
     }
   }
 
-  /** 从下拉选择已上传字体 */
+  /** 从下拉选择已上传字体，或切回系统默认 */
   async function selectFontAsset(assetId: string): Promise<boolean> {
+    if (assetId === SYSTEM_FONT_ASSET_ID) {
+      return selectSystemDefault()
+    }
+
     const asset = fontAssets.value.find((a) => a.id === assetId)
     if (!asset) {
       showError('字体不存在')
@@ -351,6 +356,48 @@ export function useFontSetting() {
     } catch (error) {
       console.error('[useFontSetting] select asset failed:', error)
       showError('切换字体失败')
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /** 切回手机系统默认字体，保留颜色与字号 */
+  async function selectSystemDefault(): Promise<boolean> {
+    loading.value = true
+    try {
+      const keepColor = draft.value.color
+      const keepSize = draft.value.fontSize
+
+      fontService.applySystemFont()
+      fontService.applyTypography({
+        color: keepColor,
+        fontSize: keepSize,
+      })
+
+      draft.value = {
+        source: null,
+        fontFamily: '',
+        fontAssetId: undefined,
+        fileData: undefined,
+        url: undefined,
+        color: keepColor,
+        fontSize: keepSize,
+      }
+
+      activeConfigId.value = null
+      editingConfigId.value = null
+      editingConfigName.value = ''
+      await clearCurrentFontConfig()
+      configs.value.forEach((c) => {
+        c.isSelected = false
+      })
+
+      showSuccess('已切回系统默认字体')
+      return true
+    } catch (error) {
+      console.error('[useFontSetting] select system default failed:', error)
+      showError('切回默认字体失败')
       return false
     } finally {
       loading.value = false
@@ -596,8 +643,13 @@ export function useFontSetting() {
   }
 
   async function resetToDefault() {
+    const keepSize = draft.value.fontSize
     fontService.clearFont()
+    // clearFont 会清字号；用户若只想回默认字族，顶部重置仍恢复默认字号与颜色
     draft.value = createDefaultDraft()
+    // 再显式套上系统字族，并保留刚重置后的默认字号
+    fontService.applySystemFont()
+    fontService.applyFontSize(draft.value.fontSize || keepSize || DEFAULT_FONT_SIZE)
     activeConfigId.value = null
     editingConfigId.value = null
     editingConfigName.value = ''

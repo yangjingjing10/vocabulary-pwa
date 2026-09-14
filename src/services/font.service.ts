@@ -4,6 +4,7 @@ import {
   DEFAULT_FONT_SIZE,
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
+  SYSTEM_FONT_FAMILY,
 } from '@/pages/profile/css/font/types/font'
 
 const STYLE_ELEMENT_ID = 'app-custom-font-face'
@@ -141,6 +142,17 @@ class FontService {
     }
   }
 
+  /** 切回手机 / 系统默认字体（保留颜色与字号） */
+  applySystemFont() {
+    this.currentConfig = null
+    const styleEl = document.getElementById(STYLE_ELEMENT_ID)
+    styleEl?.remove()
+
+    const root = document.documentElement
+    root.style.setProperty('--app-font-family', SYSTEM_FONT_FAMILY)
+    root.style.fontFamily = SYSTEM_FONT_FAMILY
+  }
+
   clearFont() {
     this.currentConfig = null
     const styleEl = document.getElementById(STYLE_ELEMENT_ID)
@@ -156,6 +168,9 @@ class FontService {
     root.style.removeProperty('font-family')
     root.style.removeProperty('font-size')
     root.style.removeProperty('color')
+    // 恢复系统默认字族，避免仍残留自定义 @font-face 影响
+    root.style.setProperty('--app-font-family', SYSTEM_FONT_FAMILY)
+    root.style.fontFamily = SYSTEM_FONT_FAMILY
     clearStoredFontSize()
   }
 

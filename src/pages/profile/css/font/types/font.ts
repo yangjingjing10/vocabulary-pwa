@@ -1,6 +1,13 @@
 /** 字体配置来源 */
 export type FontSource = 'file' | 'url'
 
+/** 下拉中的系统默认选项 id */
+export const SYSTEM_FONT_ASSET_ID = '__system__'
+
+/** 手机 / 系统默认字体栈 */
+export const SYSTEM_FONT_FAMILY =
+  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+
 /** 已上传 / 导入的字体资源（与配置分离，删配置不删字体） */
 export interface FontAsset {
   id: string

@@ -8,7 +8,8 @@
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
-    "dict:build": "node scripts/build-ecdict-core.mjs"
+    "dict:build": "node scripts/build-ecdict-core.mjs",
+    "dict:examples": "node scripts/build-ecdict-examples.mjs"
   },
   "dependencies": {
     "crypto-js": "^4.2.0",

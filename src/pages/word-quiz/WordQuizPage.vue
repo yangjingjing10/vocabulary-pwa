@@ -12,17 +12,28 @@ import type { QuizPauseResult } from './types/quizPause'
 import type { QuizResult } from './types/quiz'
 import type { QuizBatch, QuizWord } from './types/quizPause'
 import { getCorrectAnswer } from './utils/quizAnswerMatch'
-import { mergePendingWrongWords } from '@/db/repositories/choice-practice-state.repository'
+import {
+  collectPendingWrongWords,
+  getChoicePracticeState,
+  getRemainingWrongWords,
+  mergePendingWrongWords,
+} from '@/db/repositories/choice-practice-state.repository'
+import { settleYesterdayReviewWords } from '@/services/practice-mix.service'
+import { settleReviewedWords } from '@/services/review-session.service'
+import { shiftLocalDate } from '@/utils/localDate'
 
 import '@/styles/pages/word-quiz-page.css'
 
 interface Props {
   words: string[]
   date?: string
+  /** 复习模式：答错回炉，答对搁置 */
+  reviewMode?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   date: '',
+  reviewMode: false,
 })
 const emit = defineEmits<{
   back: []
@@ -46,13 +57,22 @@ const {
   isGrading,
   isLoading,
   isAnswerLocked,
+  answerFeedback,
+  feedbackCorrectAnswer,
   initializeQuiz,
   submitCurrentAnswer,
   skipQuestion,
+  acknowledgeFeedback,
   collectGradedResults,
   setResults,
   setStatus,
-} = useQuizState(props.words)
+  isQuestionSettled,
+  buildQuestion,
+} = useQuizState(props.words, { reviewMode: props.reviewMode })
+
+const pauseNamespace = computed(() =>
+  props.reviewMode ? ('review' as const) : ('practice' as const),
+)
 
 const {
   currentBatch,
@@ -66,7 +86,7 @@ const {
   getCheckedWords,
   getWrongWords,
   clearBatch,
-} = useQuizPause(toRef(props, 'date'))
+} = useQuizPause(toRef(props, 'date'), pauseNamespace)
 
 const showPausePanel = ref(false)
 const pauseResult = ref<QuizPauseResult | null>(null)
@@ -76,8 +96,52 @@ const pendingRemaining = ref<QuizWord[]>([])
 /** 查看暂停结果后仍有剩余题 */
 const isPartialResults = ref(false)
 const remainingAfterPause = ref(0)
+const mixedReviewCount = ref(0)
+
+const loadingHint = computed(() => {
+  if (props.reviewMode) {
+    if (mixedReviewCount.value > 0) {
+      return `复习 · ${props.words.length} 词（含 ${mixedReviewCount.value} 个错题优先）`
+    }
+    return `复习 · 本轮 ${props.words.length} 词 · 对搁错留`
+  }
+  if (mixedReviewCount.value > 0) {
+    return `看英文写意思 · 已混入昨日错题 ${mixedReviewCount.value} 个`
+  }
+  return '看英文语境，写出中文意思'
+})
+
+async function detectMixedReviewCount() {
+  if (!props.date || props.words.length === 0) {
+    mixedReviewCount.value = 0
+    return
+  }
+  try {
+    if (props.reviewMode) {
+      const remaining = new Set(
+        (await collectPendingWrongWords()).map((w) => w.trim().toLowerCase()),
+      )
+      mixedReviewCount.value = props.words.filter((w) =>
+        remaining.has(w.trim().toLowerCase()),
+      ).length
+      return
+    }
+    const yesterday = shiftLocalDate(props.date, -1)
+    const state = await getChoicePracticeState(yesterday)
+    const remaining = new Set(
+      getRemainingWrongWords(state).map((w) => w.trim().toLowerCase()),
+    )
+    mixedReviewCount.value = props.words.filter((w) =>
+      remaining.has(w.trim().toLowerCase()),
+    ).length
+  } catch {
+    mixedReviewCount.value = 0
+  }
+}
 
 onMounted(async () => {
+  void detectMixedReviewCount()
+
   const unfinishedBatch = loadUnfinishedBatch()
 
   if (unfinishedBatch) {
@@ -102,8 +166,15 @@ async function startFreshQuiz() {
   isPartialResults.value = false
   remainingAfterPause.value = 0
   await initializeQuiz()
+  const seen = new Set<string>()
+  const seeds = questions.value.filter((q) => {
+    const key = q.word.trim().toLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
   createBatch(
-    questions.value.map((q) => ({
+    seeds.map((q) => ({
       word: q.word,
       translation: q.translation,
       direction: q.direction,
@@ -111,12 +182,12 @@ async function startFreshQuiz() {
   )
 }
 
-function handleResumeContinue() {
+async function handleResumeContinue() {
   if (!pendingBatch.value) return
   showResumeDialog.value = false
   isPartialResults.value = false
   remainingAfterPause.value = 0
-  loadUnfinishedTest(pendingBatch.value, pendingRemaining.value)
+  await loadUnfinishedTest(pendingBatch.value, pendingRemaining.value)
   pendingBatch.value = null
   pendingRemaining.value = []
 }
@@ -125,17 +196,22 @@ async function handleResumeStartNew() {
   showResumeDialog.value = false
   pendingBatch.value = null
   pendingRemaining.value = []
+  clearBatch()
+  // 复习放弃进度：回首页，下次点复习重新选词量
+  if (props.reviewMode) {
+    emit('back')
+    return
+  }
   await startFreshQuiz()
 }
 
-function loadUnfinishedTest(batch: QuizBatch, remainingWords: QuizWord[]) {
+async function loadUnfinishedTest(batch: QuizBatch, remainingWords: QuizWord[]) {
   currentBatch.value = batch
-  questions.value = remainingWords.map((w) => ({
-    word: w.word,
-    translation: w.translation || '',
-    direction: w.direction || 'en-to-zh',
-    userAnswer: '',
-  }))
+  questions.value = await Promise.all(
+    remainingWords.map((w) =>
+      buildQuestion(w.word, w.translation || '', 0),
+    ),
+  )
 
   currentQuestionIndex.value = 0
   userAnswer.value = ''
@@ -174,6 +250,27 @@ async function persistSessionWrongs(batch: QuizBatch | null) {
     await mergePendingWrongWords(props.date, wrongs)
   } catch (error) {
     console.error('Failed to save wrong words:', error)
+  }
+}
+
+/** 结算错题池进度 */
+async function settleReviewProgress(graded: QuizResult[]) {
+  if (!props.date || graded.length === 0) return
+  try {
+    if (props.reviewMode) {
+      await settleReviewedWords({
+        practiceDate: props.date,
+        correctWords: graded.filter((r) => r.isCorrect).map((r) => r.word),
+        wrongWords: graded.filter((r) => !r.isCorrect).map((r) => r.word),
+      })
+      return
+    }
+    await settleYesterdayReviewWords(
+      props.date,
+      graded.map((r) => r.word),
+    )
+  } catch (error) {
+    console.error('Failed to settle review words:', error)
   }
 }
 
@@ -217,47 +314,49 @@ async function finishWithLocalResults() {
   setResults([...earlierResults, ...sessionResults])
   isPartialResults.value = false
   remainingAfterPause.value = 0
+  const allResults = [...earlierResults, ...sessionResults]
   await persistSessionWrongs(currentBatch.value)
+  await settleReviewProgress(allResults)
   clearBatch()
 }
 
 function handleNext() {
-  const indexBefore = currentQuestionIndex.value
-  const question = questions.value[indexBefore]
-  const outcome = submitCurrentAnswer()
-
-  if (outcome === 'rejected' || outcome === 'skipped-empty') return
-
-  if (question?.gradeResult) {
-    persistQuestionByRef(question, false)
-  }
-
-  if (outcome === 'finished') {
-    void finishWithLocalResults()
-  }
+  submitCurrentAnswer()
 }
 
 function handleSkip() {
+  skipQuestion()
+}
+
+async function handleAcknowledge() {
   const indexBefore = currentQuestionIndex.value
   const question = questions.value[indexBefore]
-  const outcome = skipQuestion()
+  const outcome = await acknowledgeFeedback()
 
   if (outcome === 'rejected') return
 
-  if (question?.gradeResult) {
-    persistQuestionByRef(question, true)
+  // 仅结算后的题写入暂停批次，避免错题重练时被当成已完成
+  if (question?.gradeResult && isQuestionSettled(question)) {
+    persistQuestionByRef(question, !question.userAnswer.trim())
   }
 
   if (outcome === 'finished') {
-    void finishWithLocalResults()
+    await finishWithLocalResults()
   }
 }
 
 async function handlePause() {
   // 确保有 batch，并把当前页面上已处理的题都同步进去
   if (!currentBatch.value) {
+    const seen = new Set<string>()
+    const seeds = questions.value.filter((q) => {
+      const key = q.word.trim().toLowerCase()
+      if (!key || seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
     createBatch(
-      questions.value.map((q) => ({
+      seeds.map((q) => ({
         word: q.word,
         translation: q.translation,
         direction: q.direction,
@@ -267,7 +366,7 @@ async function handlePause() {
 
   const batch = currentBatch.value!
   questions.value.forEach((q) => {
-    if (!q.gradeResult) return
+    if (!isQuestionSettled(q) || !currentBatch.value) return
     const skipped = !q.userAnswer.trim()
     syncQuestionProgress(batch, {
       word: q.word,
@@ -296,6 +395,7 @@ async function handlePause() {
     const result = await pauseAndCheck(batch)
     pauseResult.value = result
     await persistSessionWrongs(batch)
+    await settleReviewProgress(getCheckedWords(batch).map(batchWordToResult))
     showPausePanel.value = true
     setStatus('testing')
   } catch (error) {
@@ -331,6 +431,7 @@ async function handleViewPauseResults() {
 
   setResults(quizResults)
   await persistSessionWrongs(batch)
+  await settleReviewProgress(quizResults)
 
   // 还有剩余题：保留批次，下次/本页可续测；不要 clearBatch
   if (remainingWords.length > 0) {
@@ -344,7 +445,7 @@ async function handleViewPauseResults() {
   }
 }
 
-function handleContinueTest() {
+async function handleContinueTest() {
   showPausePanel.value = false
 
   if (!currentBatch.value) return
@@ -352,14 +453,14 @@ function handleContinueTest() {
   const remainingWords = getPendingWords(currentBatch.value)
 
   if (remainingWords.length === 0) {
-    void handleViewPauseResults()
+    await handleViewPauseResults()
     return
   }
 
-  loadUnfinishedTest(currentBatch.value, remainingWords)
+  await loadUnfinishedTest(currentBatch.value, remainingWords)
 }
 
-function handleContinueFromResults() {
+async function handleContinueFromResults() {
   const batch = currentBatch.value || loadUnfinishedBatch()
   if (!batch) return
 
@@ -370,7 +471,7 @@ function handleContinueFromResults() {
     return
   }
 
-  loadUnfinishedTest(batch, remainingWords)
+  await loadUnfinishedTest(batch, remainingWords)
 }
 
 function handleClosePausePanel() {
@@ -399,7 +500,7 @@ function handleBack() {
   if (currentBatch.value && (!isCompleted.value || isPartialResults.value)) {
     if (!isCompleted.value) {
       questions.value.forEach((q) => {
-        if (!q.gradeResult || !currentBatch.value) return
+        if (!isQuestionSettled(q) || !currentBatch.value) return
         const skipped = !q.userAnswer.trim()
         syncQuestionProgress(currentBatch.value, {
           word: q.word,
@@ -446,7 +547,7 @@ const resultsTitle = computed(() =>
       <div v-if="isLoading && !showResumeDialog" class="quiz-loading">
         <Loader2 class="is-spinning" :size="48" />
         <p>正在准备题目...</p>
-        <p class="quiz-loading__hint">英译中 / 中译英 五五开</p>
+        <p class="quiz-loading__hint">{{ loadingHint }}</p>
       </div>
 
       <QuizQuestion
@@ -457,8 +558,12 @@ const resultsTitle = computed(() =>
         :progress="progress"
         :total-questions="questions.length"
         :current-index="currentQuestionIndex"
+        :answer-feedback="answerFeedback"
+        :is-answer-locked="isAnswerLocked"
+        :feedback-correct-answer="feedbackCorrectAnswer"
         @next="handleNext"
         @skip="handleSkip"
+        @acknowledge="handleAcknowledge"
       />
 
       <div v-else-if="isGrading" class="quiz-loading">
@@ -498,6 +603,7 @@ const resultsTitle = computed(() =>
     <QuizResumeDialog
       :is-visible="showResumeDialog"
       :remaining-count="pendingRemaining.length"
+      :review-mode="reviewMode"
       @continue="handleResumeContinue"
       @start-new="handleResumeStartNew"
     />

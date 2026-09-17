@@ -497,6 +497,47 @@
   font-style: italic;
 }
 
+.definition-card__phrases {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--app-font-color-muted, #94a3b8) 25%, transparent);
+}
+
+.definition-card__phrases-title {
+  margin: 0 0 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--app-font-color-muted, #64748b);
+}
+
+.definition-card__phrases-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.definition-card__phrase-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.definition-card__phrase {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.definition-card__phrase-tr {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--app-font-color-muted, #64748b);
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }

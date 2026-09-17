@@ -6,9 +6,17 @@ export interface VocabularyWord {
   phonetic?: string
   pos?: string
   translation?: string
+  /** 固定搭配 / 短语（本地 ECDICT 或导入时 AI 补全） */
+  phrases?: WordPhrase[]
   source: 'ocr' | 'manual' | 'file'
   addedAt: number
   date: string
+}
+
+/** 单词相关的短语/固定搭配 */
+export interface WordPhrase {
+  phrase: string
+  translation: string
 }
 
 export interface ApiConfig {
@@ -57,6 +65,20 @@ export interface Article {
   words: string[]
   date: string
   createdAt: number
+  /** ai=主题短文；rss=今日新闻只读保存 */
+  kind?: 'ai' | 'rss'
+  /** 新闻来源（结构化，UI 单独展示短链） */
+  sources?: ArticleSourceRef[]
+  /** 本篇主题短标签 */
+  theme?: string
+  /** 原文链接（rss） */
+  link?: string
+}
+
+export interface ArticleSourceRef {
+  title: string
+  link: string
+  outlet?: string
 }
 
 export interface TranslationRecord {
@@ -133,6 +155,43 @@ export interface LocalDictEntry {
   tag: string
 }
 
+/** 单词关联的短语/固定搭配（来自 ECDICT 短语反查包） */
+export interface LocalPhraseItem {
+  phrase: string
+  translation: string
+}
+
+/** 本地短语反查索引：按单词查相关短语 */
+export interface LocalPhraseIndexEntry {
+  word: string
+  phrases: LocalPhraseItem[]
+}
+
+/** 形近词条目 */
+export interface LocalLookalikeItem {
+  word: string
+  translation: string
+  pos: string
+}
+
+/** 本地形近词索引 */
+export interface LocalLookalikeIndexEntry {
+  word: string
+  items: LocalLookalikeItem[]
+}
+
+/** 本地例句条目（Tatoeba 等） */
+export interface LocalExampleItem {
+  sentence: string
+  translation: string
+}
+
+/** 本地例句索引：按单词查例句 */
+export interface LocalExampleIndexEntry {
+  word: string
+  examples: LocalExampleItem[]
+}
+
 /** 本地词库元信息（是否已导入、版本等） */
 export interface LocalDictMeta {
   id: 'core'
@@ -140,6 +199,16 @@ export interface LocalDictMeta {
   count: number
   importedAt: number
   source: string
+  /** 短语反查包版本；未导入时为 0 */
+  phraseVersion?: number
+  /** 有反查短语的单词数 */
+  phraseWordCount?: number
+  /** 形近词包版本 */
+  lookalikeVersion?: number
+  lookalikeWordCount?: number
+  /** 例句包版本 */
+  exampleVersion?: number
+  exampleWordCount?: number
 }
 
 /** 单道选择题作答明细 */
@@ -245,6 +314,18 @@ export interface VocabularyDatabase extends DBSchema {
   localDictMeta: {
     key: string
     value: LocalDictMeta
+  }
+  localPhraseIndex: {
+    key: string
+    value: LocalPhraseIndexEntry
+  }
+  localLookalikeIndex: {
+    key: string
+    value: LocalLookalikeIndexEntry
+  }
+  localExampleIndex: {
+    key: string
+    value: LocalExampleIndexEntry
   }
   choiceQuizRecords: {
     key: string

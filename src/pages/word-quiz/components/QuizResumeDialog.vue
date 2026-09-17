@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Clock } from 'lucide-vue-next'
 
-defineProps<{
+const props = defineProps<{
   isVisible: boolean
   remainingCount: number
+  reviewMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -19,9 +20,14 @@ const emit = defineEmits<{
         <div class="quiz-resume-panel__icon">
           <Clock :size="22" />
         </div>
-        <h2 class="quiz-resume-panel__title">未完成的测试</h2>
+        <h2 class="quiz-resume-panel__title">
+          {{ props.reviewMode ? '未完成的复习' : '未完成的练习' }}
+        </h2>
         <p class="quiz-resume-panel__desc">
           检测到剩余 <strong>{{ remainingCount }}</strong> 个单词尚未作答，可接着测完。
+          <template v-if="props.reviewMode">
+            （与今日练习进度互不影响）
+          </template>
         </p>
         <div class="quiz-resume-panel__actions">
           <button

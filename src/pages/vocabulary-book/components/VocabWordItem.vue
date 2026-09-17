@@ -27,6 +27,12 @@ function playAudio(word: string) {
         <span class="vocab-word__phonetic">{{ word.phonetic }}</span>
       </div>
       <p><span class="vocab-word__pos">{{ word.pos }}</span>{{ word.translation }}</p>
+      <ul v-if="word.phrases?.length" class="vocab-word__phrases">
+        <li v-for="item in word.phrases" :key="item.phrase">
+          <span class="vocab-word__phrase">{{ item.phrase }}</span>
+          <span class="vocab-word__phrase-tr">{{ item.translation }}</span>
+        </li>
+      </ul>
     </div>
     <button class="vocab-word__audio" type="button" @click="playAudio(word.word)">
       <Volume2 :size="14" />

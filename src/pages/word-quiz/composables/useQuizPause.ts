@@ -4,6 +4,9 @@ import type { QuizDirection } from '../types/quiz'
 import { checkQuizAnswer, getCorrectAnswer } from '../utils/quizAnswerMatch'
 
 const LEGACY_STORAGE_KEY = 'quiz_current_batch'
+const REVIEW_STORAGE_KEY = 'quiz_review_batch'
+
+export type QuizPauseNamespace = 'practice' | 'review'
 
 export type QuizBatchSeed = {
   word: string
@@ -11,16 +14,57 @@ export type QuizBatchSeed = {
   direction?: QuizDirection
 }
 
+function storageKeyFor(date: string, namespace: QuizPauseNamespace): string {
+  const d = date.trim()
+  const base = namespace === 'review' ? REVIEW_STORAGE_KEY : LEGACY_STORAGE_KEY
+  return d ? `${base}:${d}` : base
+}
+
+function countPendingWords(batch: QuizBatch): number {
+  return batch.words.filter((w) => {
+    if (w.skipped) return false
+    if (w.aiResult) return false
+    if (w.userAnswer && w.userAnswer.trim() !== '') return false
+    return true
+  }).length
+}
+
 /**
- * 单词测试暂停 / 续测逻辑（按日期隔离批次，避免串天）
+ * 只读查看是否有未完成暂停批次（首页点「复习」时先判断是否应直接续测）
  */
-export function useQuizPause(date?: MaybeRefOrGetter<string>) {
+export function peekUnfinishedQuizBatch(
+  date: string,
+  namespace: QuizPauseNamespace = 'practice',
+): { batch: QuizBatch; remainingCount: number } | null {
+  try {
+    const key = storageKeyFor(date, namespace)
+    const raw = localStorage.getItem(key)
+    if (!raw) return null
+    const batch: QuizBatch = JSON.parse(raw)
+    if (batch.status !== 'ongoing' && batch.status !== 'paused') return null
+    const remainingCount = countPendingWords(batch)
+    if (remainingCount === 0) return null
+    const d = date.trim()
+    if (d && batch.date && batch.date !== d) return null
+    return { batch, remainingCount }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 单词测试暂停 / 续测逻辑（按日期 + 练习/复习命名空间隔离，互不覆盖）
+ */
+export function useQuizPause(
+  date?: MaybeRefOrGetter<string>,
+  namespace: MaybeRefOrGetter<QuizPauseNamespace> = 'practice',
+) {
   const currentBatch = ref<QuizBatch | null>(null)
   const isPausing = ref(false)
 
   function getStorageKey() {
-    const d = (toValue(date) || '').trim()
-    return d ? `${LEGACY_STORAGE_KEY}:${d}` : LEGACY_STORAGE_KEY
+    const ns = toValue(namespace) === 'review' ? 'review' : 'practice'
+    return storageKeyFor(toValue(date) || '', ns)
   }
 
   function createBatch(seeds: QuizBatchSeed[]): QuizBatch {
@@ -72,8 +116,9 @@ export function useQuizPause(date?: MaybeRefOrGetter<string>) {
       const key = getStorageKey()
       let batch = readStoredBatch(localStorage.getItem(key))
 
-      // 兼容旧版全局 key，迁移到按日期存储
-      if (!batch && key !== LEGACY_STORAGE_KEY) {
+      // 仅练习命名空间兼容旧版全局 key；复习从不读取练习进度
+      const ns = toValue(namespace) === 'review' ? 'review' : 'practice'
+      if (!batch && ns === 'practice' && key !== LEGACY_STORAGE_KEY) {
         const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY)
         const legacy = readStoredBatch(legacyRaw)
         if (legacy) {

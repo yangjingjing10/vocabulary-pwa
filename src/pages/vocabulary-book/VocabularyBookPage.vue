@@ -125,12 +125,10 @@ function confirmStartQuizDirectly() {
 
 async function handleOpenArticle(date: string) {
   try {
-    const articles = await getArticlesByDate(date)
-    if (articles.length > 0) {
-      emit('openArticle', articles[0].id)
-    }
+    const words = await getWordsByDate(date)
+    emit('generateArticle', words.map((w) => w.word), date)
   } catch (error) {
-    console.error('Failed to open article:', error)
+    console.error('Failed to open article hub:', error)
   }
 }
 

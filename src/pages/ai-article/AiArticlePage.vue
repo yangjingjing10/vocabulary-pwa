@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { ArrowLeft, Loader2, Volume2, X, RefreshCw, Sparkles, Pencil } from 'lucide-vue-next'
 
 import ParagraphTranslation from '@/pages/article-read/components/ParagraphTranslation.vue'
+import ArticleSources from '@/pages/article-read/components/ArticleSources.vue'
 import DrawingToolbar from '@/pages/article-read/components/drawing/DrawingToolbar.vue'
 import ArticleDeleteConfirmModal from '@/pages/article-read/components/ArticleDeleteConfirmModal.vue'
 import { useDrawingSession } from '@/pages/article-read/composables/useDrawingSession'
@@ -10,16 +11,21 @@ import { useArticleLongPress } from '@/pages/article-read/composables/useArticle
 import {
   ensureLocalDictionary,
   lookupLocalDictionary,
+  lookupLocalPhrases,
 } from '@/services/local-dictionary.service'
 import { articleGenerationService } from '@/services/article-generation.service'
 import { deleteArticle } from '@/db/repositories/articles.repository'
 import type { Article } from '@/db/schema/database'
+import type { ArticleGenPrefs } from '@/constants/article-gen-prefs'
+import { loadArticleGenPrefs } from '@/constants/article-gen-prefs'
 import { speakText } from '@/services/speech.service'
 
 import '@/styles/pages/article-read-page.css'
 
 interface Props {
   selectedWords: string[]
+  date?: string
+  genPrefs?: ArticleGenPrefs
 }
 
 const props = defineProps<Props>()
@@ -34,6 +40,18 @@ interface SessionArticle extends Article {
 }
 
 const isGenerating = computed(() => articleGenerationService.isGenerating.value)
+const batchProgress = computed(() => articleGenerationService.batchProgress.value)
+const generatingHint = computed(() => {
+  const p = batchProgress.value
+  if (!isGenerating.value) return ''
+  if (p.done === 0 && p.remaining === p.totalWords) {
+    return '正在均分单词并生成第 1 篇…可返回，完成后会提醒你'
+  }
+  if (p.remaining > 0) {
+    return `已生成 ${p.done} 篇，剩余约 ${p.remaining} 词…`
+  }
+  return '正在收尾…'
+})
 const articles = computed<SessionArticle[]>(() =>
   articleGenerationService.sessionArticles.value.map((a, index) => ({
     ...a,
@@ -79,15 +97,26 @@ const pendingDeleteArticle = computed(
 )
 
 onMounted(() => {
+  const prefs = props.genPrefs ?? loadArticleGenPrefs()
   // 若已有同批会话文章就直接展示；否则后台开生成（离开页也继续）
   if (articleGenerationService.sessionArticles.value.length === 0) {
-    void articleGenerationService.start(props.selectedWords, { appendToSession: false })
+    void articleGenerationService.start(props.selectedWords, {
+      appendToSession: false,
+      date: props.date,
+      mode: 'batch-theme',
+      prefs,
+    })
   } else if (
     articleGenerationService.status.value !== 'generating' &&
     JSON.stringify(articleGenerationService.lastWords.value) !== JSON.stringify(props.selectedWords)
   ) {
     articleGenerationService.clearSession()
-    void articleGenerationService.start(props.selectedWords, { appendToSession: false })
+    void articleGenerationService.start(props.selectedWords, {
+      appendToSession: false,
+      date: props.date,
+      mode: 'batch-theme',
+      prefs,
+    })
   }
 })
 
@@ -96,7 +125,29 @@ onUnmounted(() => {
 })
 
 function generateArticle() {
-  void articleGenerationService.start(props.selectedWords, { appendToSession: true })
+  const prefs = props.genPrefs ?? loadArticleGenPrefs()
+  // 再生成：用剩余未覆盖的词，仍按用户选定的篇数均分
+  const used = new Set(
+    articleGenerationService.sessionArticles.value.flatMap((a) =>
+      a.words.map((w) => w.toLowerCase()),
+    ),
+  )
+  const remaining = props.selectedWords.filter((w) => !used.has(w.toLowerCase()))
+  if (remaining.length) {
+    void articleGenerationService.start(remaining, {
+      session: 'append',
+      date: props.date,
+      mode: 'batch-theme',
+      prefs,
+    })
+  } else {
+    void articleGenerationService.start(props.selectedWords, {
+      session: 'append',
+      date: props.date,
+      mode: 'single',
+      prefs,
+    })
+  }
 }
 
 function startPractice() {
@@ -139,6 +190,7 @@ async function fetchDefinition(word: string) {
 
   try {
     await ensureLocalDictionary()
+    const phrases = await lookupLocalPhrases(word)
     const local = await lookupLocalDictionary(word)
     if (local) {
       wordDefinition.value = {
@@ -149,6 +201,7 @@ async function fetchDefinition(word: string) {
           definition: local.translation,
           example: '',
         }],
+        phrases,
       }
       return
     }
@@ -165,6 +218,7 @@ async function fetchDefinition(word: string) {
           definition: m.definitions[0].definition,
           example: m.definitions[0].example,
         })),
+        phrases,
       }
     } else {
       wordDefinition.value = {
@@ -175,6 +229,7 @@ async function fetchDefinition(word: string) {
           definition: '本地词库与在线词典均未找到该词。',
           example: '',
         }],
+        phrases,
       }
     }
   } catch {
@@ -186,6 +241,7 @@ async function fetchDefinition(word: string) {
         definition: '查词失败，请稍后重试。',
         example: '',
       }],
+      phrases: [],
     }
   } finally {
     isLoadingDefinition.value = false
@@ -228,7 +284,7 @@ function formatTime(timestamp: number) {
       <button class="article-read-icon-button" type="button" @click="emit('back')">
         <ArrowLeft :size="18" />
       </button>
-      <h1>AI Article</h1>
+          <h1>主题短文</h1>
       <div class="article-read-header__actions">
         <button
           v-if="articles.length > 0"
@@ -256,7 +312,7 @@ function formatTime(timestamp: number) {
     <main class="article-read-content">
       <div v-if="isGenerating && articles.length === 0" class="article-read-loading">
         <Loader2 class="is-spinning" :size="32" />
-        <p>正在生成文章…可返回，完成后会提醒你</p>
+        <p>{{ generatingHint || '正在生成文章…可返回，完成后会提醒你' }}</p>
       </div>
 
       <div v-else-if="showError && articles.length === 0" class="article-read-error">
@@ -268,7 +324,7 @@ function formatTime(timestamp: number) {
       <div v-else class="articles-container">
         <div v-if="isGenerating" class="article-generating-indicator">
           <Loader2 class="is-spinning" :size="20" />
-          <span>正在后台生成…离开页面也会继续</span>
+          <span>{{ generatingHint || '正在后台生成…离开页面也会继续' }}</span>
         </div>
 
         <div v-else-if="articles.length === 0" class="article-read-error">
@@ -311,6 +367,12 @@ function formatTime(timestamp: number) {
             :drawing-color="drawingColor"
             :drawing-width="drawingWidth"
             @word-click="handleWordClick"
+          />
+
+          <ArticleSources
+            v-if="article.sources?.length || article.theme"
+            :sources="article.sources || []"
+            :theme="article.theme"
           />
 
           <div v-if="index === 0" class="article-read-practice">
@@ -372,6 +434,23 @@ function formatTime(timestamp: number) {
               <span class="definition-card__pos">{{ meaning.partOfSpeech }}</span>
               <p class="definition-card__def">{{ meaning.definition }}</p>
               <p v-if="meaning.example" class="definition-card__example">"{{ meaning.example }}"</p>
+            </div>
+
+            <div
+              v-if="wordDefinition.phrases?.length"
+              class="definition-card__phrases"
+            >
+              <h4 class="definition-card__phrases-title">相关短语</h4>
+              <ul class="definition-card__phrases-list">
+                <li
+                  v-for="item in wordDefinition.phrases"
+                  :key="item.phrase"
+                  class="definition-card__phrase-item"
+                >
+                  <span class="definition-card__phrase">{{ item.phrase }}</span>
+                  <span class="definition-card__phrase-tr">{{ item.translation }}</span>
+                </li>
+              </ul>
             </div>
           </div>
         </div>

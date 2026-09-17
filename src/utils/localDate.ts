@@ -25,3 +25,8 @@ export function parseLocalDate(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number)
   return new Date(y, (m || 1) - 1, d || 1)
 }
+
+/** 相对某本地日加减天数，返回 YYYY-MM-DD */
+export function shiftLocalDate(dateStr: string, days: number): string {
+  return formatLocalDate(addLocalDays(parseLocalDate(dateStr), days))
+}

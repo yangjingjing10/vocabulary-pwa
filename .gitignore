@@ -4,7 +4,11 @@ dist
 *.local
 .DS_Store
 
-# 原始 ECDICT 大文件（勿提交）；精简包在 public/dict/ecdict-core.json
+# 旁路编译产物（以 .vue / .ts 源文件为准，勿提交）
+*.vue.js
+src/**/*.js
+
+# 原始 ECDICT / Tatoeba 大文件（勿提交）；精简包在 public/dict/
 ecdict.csv
 ecdict*.csv
 *.7z

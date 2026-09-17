@@ -1,0 +1,612 @@
+================================================================================
+背单词软件（vocabulary-pwa）— 界面功能与文件清单
+================================================================================
+项目类型：Vue 3 + TypeScript + Vite PWA（本地 IndexedDB）
+路由方式：无 vue-router；由 App.vue 的 activeView 切换视图
+文档范围：src 下 .vue / .ts 源文件 + 独立 CSS（不含 .vue.js 编译产物）
+更新日期：2026-09-17
+
+--------------------------------------------------------------------------------
+一、应用视图总览（App.vue 可切换）
+--------------------------------------------------------------------------------
+study          → 学习主页 HomePage
+profile        → 个人中心 ProfilePage
+api            → API 设置
+css-index      → 自定义外观入口
+css-wallpaper  → 壁纸设置
+css-font       → 字体设置
+prompt-index   → 提示词配置入口
+article-prompt → 文章生成提示词
+quiz-prompt    → 选择题提示词
+data-backup    → 数据备份
+rss-feeds      → 新闻源 RSS
+import         → 单词导入
+vocabulary     → 单词本
+article        → AI 主题短文生成会话
+article-hub    → 阅读入口（AI / 今日新闻 / 已保存）
+news-brief     → 今日新闻只读列表与段译
+article-read   → 文章阅读页
+word-quiz      → 默写/填空测验
+choice-quiz    → AI 选择题练习
+
+================================================================================
+二、入口与公共组件
+================================================================================
+
+src/main.ts
+  — 创建 Vue 应用并挂载 #app；启动时初始化壁纸、字体服务，引入全局样式。
+
+src/App.vue
+  — 根组件：注册 PWA Service Worker；维护全部页面视图与导航参数；
+    订阅后台文章生成 toast；加载用户资料；协调各页面跳转与回传。
+
+src/components/navigation/BottomNavigation.vue
+  — 底部双 Tab 导航（学习 / 主页），向父组件抛出 navigate。
+
+src/vite-env.d.ts
+  — Vite / PWA 客户端类型声明。
+
+================================================================================
+三、学习主页（Home）
+================================================================================
+
+src/pages/HomePage.vue
+  — 学习主页：周时间轴 + 今日单词轮播 + 功能入口导航 + 底栏。
+
+src/pages/home/components/HomeWeekTimeline.vue
+  — 本周一至日日期条；支持选日、左右滑切周。
+
+src/pages/home/components/TodayWordCarousel.vue
+  — 按选中日期加载单词并自动/手势轮播；点按切换释义，长按打开全屏详情。
+
+src/pages/home/components/WordDetailPage.vue
+  — 全屏单词详情：释义、固定搭配、相近词（默认折叠）、本地例句（默认预览 2 条可展开）；左右滑动切换当日单词。
+
+src/pages/home/utils/relatedWords.ts
+  — 相近词匹配：形近（编辑距离）、同根、近义；已移除易误伤的同缀规则。
+
+src/pages/home/components/HomeOrbitNav.vue
+  — 「单词本 / 阅读 / 练习 / 复习」入口；练习混入昨日错题，复习打开设置弹层。
+
+src/pages/home/components/ReviewSetupModal.vue
+  — 复习设置：混合/日期范围、单次题量、错题优先组卷。
+
+================================================================================
+四、单词导入
+================================================================================
+
+src/pages/word-import/WordImportPage.vue
+  — 相机/上传 OCR 或手输导入单词；补释义与固定搭配后写入本地词库。
+
+================================================================================
+五、单词本（vocabulary-book）
+================================================================================
+
+【页面】
+src/pages/vocabulary-book/VocabularyBookPage.vue
+  — 按周浏览单词/文章/选择题记录；支持导入、测验、生成文章、删日数据。
+
+【组件】
+src/pages/vocabulary-book/components/VocabHeader.vue
+  — 顶栏：返回、搜索、导入入口与本周词数。
+
+src/pages/vocabulary-book/components/VocabWeekControl.vue
+  — 年月周切换与日历入口控件。
+
+src/pages/vocabulary-book/components/VocabEmptyState.vue
+  — 无单词时的空状态提示。
+
+src/pages/vocabulary-book/components/VocabDayCard.vue
+  — 单日卡片：词列表、翻译记录、文章/选择题入口、长按删除。
+
+src/pages/vocabulary-book/components/VocabWordItem.vue
+  — 单词本内单条单词展示项。
+
+src/pages/vocabulary-book/components/VocabCalendarModal.vue
+  — 选年月周的日历弹层。
+
+src/pages/vocabulary-book/components/TranslationRecordsList.vue
+  — 某日翻译练习记录列表。
+
+src/pages/vocabulary-book/components/TranslationRecordModal.vue
+  — 单条翻译记录详情（分数、反馈、用词情况）。
+
+src/pages/vocabulary-book/components/QuizStartConfirmModal.vue
+  — 开始单词测验前的确认弹窗。
+
+src/pages/vocabulary-book/components/DayDeleteConfirmModal.vue
+  — 删除整日数据确认弹窗。
+
+src/pages/vocabulary-book/components/ChoiceQuizRecordsPage.vue
+  — 某日选择题练习记录详情；支持按剩余错题续练。
+
+【Composables】
+src/pages/vocabulary-book/composables/useWeekNavigation.ts
+  — 年月周导航与周区间计算。
+
+src/pages/vocabulary-book/composables/useVocabularyData.ts
+  — 加载/筛选/统计周单词与日数据结构。
+
+src/pages/vocabulary-book/composables/useDebugTools.ts
+  — 开发用：填充/清空测试单词与文章数据。
+
+================================================================================
+六、阅读入口与文章生成
+================================================================================
+
+src/pages/ai-article/ArticleHubPage.vue
+  — 阅读分流：AI 主题短文 / 今日新闻；下列出当日已保存文章（生成或读过的都会保留）。
+
+src/pages/ai-article/AiArticlePage.vue
+  — 用选中单词按题材分批生成短文直至词用完；含查词、朗读、涂鸦、长按删除。
+
+src/pages/ai-article/NewsBriefPage.vue
+  — 拉取 RSS 列表；点开保存为当日文章并可段译；不 AI 改写。
+
+================================================================================
+七、文章阅读（article-read）
+================================================================================
+
+【页面】
+src/pages/article-read/ArticleReadPage.vue
+  — 按 articleId 加载同日文章阅读页；支持查词、续生成、涂鸦、长按删除。
+
+【组件】
+src/pages/article-read/components/ParagraphTranslation.vue
+  — 按段展示英文、内联翻译、AI 润色与段落涂鸦画布。
+
+src/pages/article-read/components/InlineTranslationToggle.vue
+  — 段落「展开/收起翻译」箭头按钮。
+
+src/pages/article-read/components/TranslationBubble.vue
+  — 可编辑的段落译文输入气泡（contenteditable）。
+
+src/pages/article-read/components/TranslationDiff.vue
+  — 用 diff 对照展示原文译与 AI 润色结果；支持采纳/忽略。
+
+src/pages/article-read/components/ArticleDeleteConfirmModal.vue
+  — 删除文章确认弹窗。
+
+src/pages/article-read/components/ArticleAnnotation.vue
+  — 文本批注 UI 骨架（TODO，尚未完整实现）。
+
+src/pages/article-read/components/drawing/DrawingToolbar.vue
+  — 涂鸦工具栏：笔/橡皮/平移、颜色、线宽、关闭。
+
+src/pages/article-read/components/drawing/ParagraphDrawingCanvas.vue
+  — 单段落叠加 canvas；绘制/擦除并同步笔画仓库。
+
+src/pages/article-read/components/drawing/ToolModeButton.vue
+  — 涂鸦工具模式切换按钮。
+
+src/pages/article-read/components/drawing/PenColorPicker.vue
+  — 笔触颜色选择器。
+
+src/pages/article-read/components/drawing/PenWidthPicker.vue
+  — 笔触线宽选择器。
+
+【Composables】
+src/pages/article-read/composables/useDrawingSession.ts
+  — 页面级涂鸦会话（开关、工具、颜色、线宽）。
+
+src/pages/article-read/composables/useArticleDrawingContext.ts
+  — provide/inject 整篇文章共享笔画仓库。
+
+src/pages/article-read/composables/useArticleStrokes.ts
+  — 单篇文章笔画加载与即时落盘 IndexedDB。
+
+src/pages/article-read/composables/useArticleLongPress.ts
+  — 长按文章触发删除确认（含震动反馈）。
+
+src/pages/article-read/composables/useAnnotation.ts
+  — 批注增删改查 composable（TODO 占位）。
+
+【Types / Utils】
+src/pages/article-read/types/drawing.ts
+  — 涂鸦工具、笔画、会话状态与默认颜色/线宽常量。
+
+src/pages/article-read/types/annotation.ts
+  — 批注锚点/实体/状态类型（待完善）。
+
+src/pages/article-read/utils/drawStrokes.ts
+  — 将归一化笔画绘制到 canvas。
+
+src/pages/article-read/utils/strokeHitTest.ts
+  — 橡皮/点击时的笔画命中检测。
+
+src/pages/article-read/utils/textDiff.ts
+  — 基于 LCS 的纯前端 token diff。
+
+================================================================================
+八、单词测验 — 默写/填空（word-quiz）
+================================================================================
+
+【页面】
+src/pages/word-quiz/WordQuizPage.vue
+  — 英→中默写测验主流程：即时反馈、错题重练、暂停续测、结果与进阶选择题入口。
+
+【组件】
+src/pages/word-quiz/components/QuizQuestion.vue
+  — 单题作答区：语境题干、输入、即时对错反馈与继续。
+
+src/pages/word-quiz/components/WordCarousel.vue
+  — 测验题干：单词 / 固定搭配 / 例句（高亮生词）。
+
+src/pages/word-quiz/components/WordContextSentences.vue
+  — 折叠展示目标词在已存文章中的例句。
+
+src/pages/word-quiz/components/QuizResults.vue
+  — 测验结果页：正确率、错题/跳过列表与重试/进阶。
+
+src/pages/word-quiz/components/QuizPausePanel.vue
+  — 暂停面板：已答统计与继续/看结果。
+
+src/pages/word-quiz/components/QuizResumeDialog.vue
+  — 发现未完成批次时询问是否续测。
+
+【Composables】
+src/pages/word-quiz/composables/useQuizState.ts
+  — 测验题目队列、即时反馈、错题再入队与完成状态。
+
+src/pages/word-quiz/composables/useQuizPause.ts
+  — 按日期隔离的暂停批次持久化与续测。
+
+src/pages/word-quiz/composables/useQuizGrading.ts
+  — 基于本地词典规则批改对错（不调 AI）。
+
+src/pages/word-quiz/composables/useWordContextSentences.ts
+  — 从文章库检索含目标词屈折的例句。
+
+【Types / Utils】
+src/pages/word-quiz/types/quiz.ts
+  — 测验方向、题干形态、题目、结果、状态等类型。
+
+src/pages/word-quiz/types/quizPause.ts
+  — 暂停批次与暂停结果相关类型。
+
+src/pages/word-quiz/utils/quizAnswerMatch.ts
+  — 释义清洗、英中答案匹配与英→中方向分配。
+
+src/pages/word-quiz/utils/quizPrompt.ts
+  — 抽题干：单词 / 固定搭配 / 例句三选一。
+
+src/pages/word-quiz/utils/highlightWord.ts
+  — 在搭配/例句中高亮目标词屈折形式。
+
+src/pages/word-quiz/utils/selectPracticeWords.ts
+  — 选择题抽词：优先错题、不重复已练、可补满批次。
+
+src/pages/word-quiz/utils/arrayUtils.ts
+  — Fisher-Yates 数组乱序工具。
+
+================================================================================
+九、选择题练习（quiz-choice）
+================================================================================
+
+src/pages/word-quiz/quiz-choice/index.vue
+  — AI 选择题练习页：生成、作答、翻题、交卷保存。
+
+src/pages/word-quiz/quiz-choice/composables/useChoiceQuiz.ts
+  — 抽词、分块调 AI 出题、作答状态、落库记录与错题进度。
+
+src/pages/word-quiz/quiz-choice/components/ChoiceProgress.vue
+  — 选择题进度指示。
+
+src/pages/word-quiz/quiz-choice/components/ChoiceQuestion.vue
+  — 单道选择题题干与 A–D 选项。
+
+src/pages/word-quiz/quiz-choice/components/ChoiceResult.vue
+  — 选择题交卷结果与明细展示。
+
+src/pages/word-quiz/quiz-choice/types/choiceQuiz.ts
+  — 选择题题目、明细、结果、状态类型。
+
+================================================================================
+十、个人中心（profile）
+================================================================================
+
+【主页与组件】
+src/pages/profile/ProfilePage.vue
+  — 个人主页：资料编辑、实时统计、设置入口与底栏。
+
+src/pages/profile/components/ProfileHeader.vue
+  — 头像/昵称/简介编辑区。
+
+src/pages/profile/components/ProfileStats.vue
+  — 学习天数/词数/文章数等统计展示。
+
+src/pages/profile/components/ProfileApiSettingCard.vue
+  — 跳转 API 设置的入口卡片。
+
+src/pages/profile/components/ProfileCssSettingCard.vue
+  — 跳转自定义 CSS 的入口卡片。
+
+src/pages/profile/components/ProfileSettingsList.vue
+  — 数据备份 / 提示词 / 新闻源 RSS / PWA 等设置列表。
+
+src/pages/profile/components/ProfileToast.vue
+  — 个人页轻提示条。
+
+【API 设置】
+src/pages/profile/api/ApiSettingsPage.vue
+  — 配置 LLM（含 Vision）、词典 API 优先级与语音朗读偏好。
+
+【新闻源】
+src/pages/profile/RssFeedsPage.vue
+  — 开关预置 BBC / NPR / Guardian RSS，可测试连通。
+
+【数据备份】
+src/pages/profile/data/DataBackupPage.vue
+  — 导出/导入 JSON 备份；恢复后重初始化壁纸、字体、词库。
+
+【CSS / 壁纸 / 字体】
+src/pages/profile/css/CssIndexPage.vue
+  — 自定义 CSS 分类入口（壁纸、字体；全局样式占位禁用）。
+
+src/pages/profile/css/WallpaperPage.vue
+  — 壁纸库管理：选用、模糊/透明度、轮播、上传/URL 导入。
+
+src/pages/profile/css/components/WallpaperUpload.vue
+  — 本地上传壁纸文件。
+
+src/pages/profile/css/components/WallpaperUrlImport.vue
+  — 通过 URL 导入壁纸。
+
+src/pages/profile/css/components/WallpaperEdit.vue
+  — 壁纸多选删除编辑模式。
+
+src/pages/profile/css/font/index.vue
+  — 字体设置页：资源库、颜色字号、命名配置列表。
+
+src/pages/profile/css/font/composables/useFontSetting.ts
+  — 字体资源/配置 CRUD、草稿编辑与全局应用逻辑。
+
+src/pages/profile/css/font/types/font.ts
+  — 字体资源、配置、草稿与默认字号颜色常量。
+
+src/pages/profile/css/font/components/FontPreview.vue
+  — 当前草稿字体效果预览。
+
+src/pages/profile/css/font/components/FontLibrarySelect.vue
+  — 从字体资源库选择字体系列。
+
+src/pages/profile/css/font/components/FontUpload.vue
+  — 上传本地字体文件到资源库。
+
+src/pages/profile/css/font/components/FontUrlImport.vue
+  — 通过 URL 导入字体。
+
+src/pages/profile/css/font/components/FontColorSetting.vue
+  — 全局文字颜色设置。
+
+src/pages/profile/css/font/components/FontSizeSetting.vue
+  — 全局字号滑块设置。
+
+src/pages/profile/css/font/components/FontConfigList.vue
+  — 已保存命名字体配置列表（应用/删除）。
+
+src/pages/profile/css/font/components/FontConfigSave.vue
+  — 将当前草稿命名保存或更新配置。
+
+【AI 提示词配置】
+src/pages/profile/prompt/PromptConfigIndexPage.vue
+  — 提示词配置总入口（文章生成 / 选择题）。
+
+src/pages/profile/prompt/ArticlePromptConfigPage.vue
+  — 管理「AI 生成文章」提示词集。
+
+src/pages/profile/prompt/QuizPromptConfigPage.vue
+  — 管理「选择题出题」提示词集。
+
+src/pages/profile/prompt/components/PromptHeader.vue
+  — 提示词页顶栏返回与标题。
+
+src/pages/profile/prompt/components/PromptToolbar.vue
+  — 新建/设为启用/复制/删除等工具条。
+
+src/pages/profile/prompt/components/PromptList.vue
+  — 提示词配置列表选择。
+
+src/pages/profile/prompt/components/PromptEditor.vue
+  — 提示词名称与内容编辑器。
+
+src/pages/profile/prompt/components/DeleteConfirmModal.vue
+  — 删除提示词确认弹窗。
+
+src/pages/profile/prompt/composables/usePromptConfigs.ts
+  — 文章提示词 CRUD、启用与复制。
+
+src/pages/profile/prompt/composables/useQuizPromptConfigs.ts
+  — 测验/选择题提示词 CRUD、启用与复制。
+
+src/pages/profile/prompt/composables/usePromptEditor.ts
+  — 编辑表单同步与文件导入提示词内容。
+
+src/pages/profile/prompt/composables/useToast.ts
+  — 提示词页成功/错误 toast。
+
+src/pages/profile/prompt/types/index.ts
+  — 编辑表单与 toast 类型。
+
+================================================================================
+十一、数据库（db）
+================================================================================
+
+【入口与 Schema】
+src/db/constants.ts
+  — 主库名 vocabulary-app 与当前版本号。
+
+src/db/index.ts
+  — initDatabase()：用 idb 打开库并按版本迁移创建各 objectStore。
+
+src/db/schema/database.ts
+  — 全部业务实体接口与 VocabularyDatabase DBSchema 定义。
+
+src/db/schema/constants.ts
+  — 早期/遗留 schema 常量（与现行主库常量不同）。
+
+【Repositories】
+src/db/repositories/words.repository.ts
+  — 单词增删查（按日/区间/全部）。
+
+src/db/repositories/articles.repository.ts
+  — 文章增删查；落库前去 Vue Proxy。
+
+src/db/repositories/api-config.repository.ts
+  — LLM API 配置读写删除。
+
+src/db/repositories/dictionary-api-config.repository.ts
+  — 第三方词典 API 配置 CRUD 与启用列表。
+
+src/db/repositories/prompt-config.repository.ts
+  — 文章生成提示词配置 CRUD / 启用 / 复制。
+
+src/db/repositories/quiz-prompt-config.repository.ts
+  — 选择题提示词配置 CRUD / 启用 / 复制。
+
+src/db/repositories/user-profile.repository.ts
+  — 用户资料读写与头像/昵称更新。
+
+src/db/repositories/translation-records.repository.ts
+  — 英译中练习记录增删查。
+
+src/db/repositories/paragraph-translation.repository.ts
+  — 文章段落用户译文/润色结果持久化。
+
+src/db/repositories/article-drawings.repository.ts
+  — 按文章保存/读取/清空涂鸦笔画。
+
+src/db/repositories/local-dict.repository.ts
+  — 离线 ECDICT 词条/短语/形近/例句反查批量写入、查询与 meta。
+
+src/db/repositories/choice-quiz-records.repository.ts
+  — 选择题练习记录增删查。
+
+src/db/repositories/choice-practice-state.repository.ts
+  — 按日维护待练错词与已练词进度。
+
+src/db/repositories/wallpaper.repository.ts
+  — 独立 IndexedDB 壁纸库：壁纸 CRUD、当前壁纸、轮播设置。
+
+src/db/repositories/font.repository.ts
+  — 独立 IndexedDB 字体库：字体资源与命名配置 CRUD/启用。
+
+================================================================================
+十二、业务服务（services）
+================================================================================
+
+src/services/article-generation.service.ts
+  — 单例后台生成：按题材轮换（科技/教育等）分批写短文，AI 自选合适词直至用完；离页继续、落库、会话状态与订阅通知。
+
+src/services/rss.service.ts
+  — 预置/自定义 RSS 配置读写；开发态走 Vite 代理、生产走 allorigins 拉取并解析 RSS/Atom。
+
+src/services/dictionary-api.service.ts
+  — 查词：本地 ECDICT → 远程词典 API → 用户 LLM 补释义；导入时本地短语优先，缺失则 LLM 补固定搭配。
+
+src/services/local-dictionary.service.ts
+  — 首次从静态包导入离线词库、短语、形近与 Tatoeba 例句，并提供本地查词/短语/例句。
+
+src/services/paragraph-revision.service.ts
+  — 批量调用 LLM 润色已译段落并返回 JSON 修订。
+
+src/services/speech.service.ts
+  — Web Speech 音色列表、语速偏好与朗读/停止。
+
+src/services/wallpaper.service.ts
+  — 应用 CSS 壁纸变量、轮播定时与变更订阅。
+
+src/services/font.service.ts
+  — 注入 @font-face 并应用全局字体/颜色/字号。
+
+src/services/data-backup.service.ts
+  — 汇总/导出/解析/导入用户数据 JSON（排除可重建的大词库）。
+
+src/services/practice-mix.service.ts
+  — 练习组卷：自然混入昨日未消化错题；练习后从昨日池结算。
+
+src/services/review-session.service.ts
+  — 复习组卷（混合/日期范围、题量、错题优先）与复习结算（对搁错留）。
+
+================================================================================
+十三、工具（utils）
+================================================================================
+
+src/utils/localDate.ts
+  — 本地日历日格式化/解析/加减天（避免 UTC 错日）。
+
+src/utils/imageNormalize.ts
+  — 将图片规范为受限尺寸 JPEG Data URL，供壁纸等存储。
+
+================================================================================
+十四、样式（styles）
+================================================================================
+
+src/styles/index.css
+  — 全局 CSS 变量（字体色/字号/壁纸）、滚动条与基础布局。
+
+src/styles/components/bottom-navigation.css
+  — 底部导航样式。
+
+src/styles/pages/home-page.css
+  — 主页布局与轮播/时间轴样式。
+
+src/styles/pages/word-import-page.css
+  — 单词导入页样式。
+
+src/styles/pages/vocabulary-book-page.css
+  — 单词本页样式。
+
+src/styles/pages/article-read-page.css
+  — 文章阅读/生成页与涂鸦相关样式。
+
+src/styles/pages/word-quiz-page.css
+  — 默写测验页样式。
+
+src/styles/pages/word-choice-quiz-page.css
+  — 选择题练习页样式。
+
+src/styles/pages/profile/profile-page.css
+  — 个人中心样式。
+
+src/styles/pages/profile/api-settings-page.css
+  — API 设置页样式。
+
+src/styles/pages/profile/css-pages.css
+  — CSS 索引/壁纸/字体页共用样式。
+
+src/styles/pages/profile/prompt-config-page.css
+  — 提示词配置页样式。
+
+src/styles/pages/profile/data-backup-page.css
+  — 数据备份页样式。
+
+================================================================================
+十五、补充说明
+================================================================================
+
+1. 路由模型
+   无 vue-router；App.vue 的 View 联合类型覆盖全部页面与设置子页。
+
+2. 未完成功能
+   ArticleAnnotation.vue / useAnnotation.ts / types/annotation.ts
+   均为批注功能骨架，尚未完整实现。
+
+3. IndexedDB 结构
+   - 主业务库：vocabulary-app（单词、文章、测验、配置等；含 localDict /
+     localPhraseIndex / localLookalikeIndex / localExampleIndex，备份排除、可重建）
+   - 壁纸库：由 wallpaper.repository 独立打开
+   - 字体库：由 font.repository 独立打开
+
+4. 离线词典静态包（public/dict）
+   - ecdict-core.json：ECDICT 精简释义
+   - ecdict-phrases.json：短语反查
+   - ecdict-lookalikes.json：形近词
+   - ecdict-examples.json：Tatoeba 例句（CC BY 2.0 FR；构建见 scripts/build-ecdict-examples.mjs）
+
+4. 主要用户流程
+   导入单词 → 单词本按日管理 → 生成/阅读新闻体短文（RSS 选题分批）
+   → 默写测验 →（可选）进阶选择题 → 个人中心配置 API/外观/提示词/备份
+
+6. 本文档后续可扩展
+   「界面集成关系 / 页面跳转图 / 数据流」等章节可在此文件继续追加。

@@ -1,16 +1,29 @@
 import { ref, computed } from 'vue'
 import type { AnswerFeedback, QuizQuestion, QuizResult, QuizStatus } from '../types/quiz'
 import {
-  assignDirectionsFiftyFifty,
+  assignEnToZh,
   checkQuizAnswer,
   getCorrectAnswer,
   resolveTranslations,
 } from '../utils/quizAnswerMatch'
+import { pickQuizPrompt } from '../utils/quizPrompt'
+
+/** 练习：错题再入队 1 次；复习：错题持续回炉，答对才搁置 */
+const PRACTICE_MAX_RETRIES = 1
+const REVIEW_MAX_RETRIES = 8
+
+export interface UseQuizStateOptions {
+  /** 复习模式：答错继续出现，答对暂时搁置 */
+  reviewMode?: boolean
+}
 
 /**
  * 单词测试状态管理
  */
-export function useQuizState(initialWords: string[]) {
+export function useQuizState(initialWords: string[], options: UseQuizStateOptions = {}) {
+  const isReviewMode = Boolean(options.reviewMode)
+  const maxRetries = isReviewMode ? REVIEW_MAX_RETRIES : PRACTICE_MAX_RETRIES
+
   const questions = ref<QuizQuestion[]>([])
   const currentQuestionIndex = ref(0)
   const userAnswer = ref('')
@@ -51,15 +64,36 @@ export function useQuizState(initialWords: string[]) {
   const isGrading = computed(() => status.value === 'grading')
   const isLoading = computed(() => status.value === 'loading')
 
-  function buildQuestions(
-    items: { word: string; translation: string }[],
-  ): QuizQuestion[] {
-    return assignDirectionsFiftyFifty(items).map((item) => ({
-      word: item.word,
-      translation: item.translation,
-      direction: item.direction,
+  const feedbackCorrectAnswer = computed(() => {
+    const q = currentQuestion.value
+    return q?.gradeResult?.correctAnswer || ''
+  })
+
+  async function buildQuestion(
+    word: string,
+    translation: string,
+    retryCount = 0,
+    preferNot?: QuizQuestion['promptMode'],
+  ): Promise<QuizQuestion> {
+    const prompt = await pickQuizPrompt(word, { preferNot })
+    return {
+      word,
+      translation,
+      direction: 'en-to-zh',
+      promptMode: prompt.mode,
+      promptText: prompt.text,
       userAnswer: '',
-    }))
+      retryCount,
+    }
+  }
+
+  async function buildQuestions(
+    items: { word: string; translation: string }[],
+  ): Promise<QuizQuestion[]> {
+    const ordered = assignEnToZh(items)
+    return Promise.all(
+      ordered.map((item) => buildQuestion(item.word, item.translation)),
+    )
   }
 
   async function initializeQuiz() {
@@ -73,7 +107,7 @@ export function useQuizState(initialWords: string[]) {
       translation: translationMap.get(word) || '',
     }))
 
-    questions.value = buildQuestions(items)
+    questions.value = await buildQuestions(items)
     currentQuestionIndex.value = 0
     userAnswer.value = ''
     results.value = []
@@ -82,12 +116,15 @@ export function useQuizState(initialWords: string[]) {
 
   function clearFeedback() {
     answerFeedback.value = null
+    isAnswerLocked.value = false
   }
 
   /**
-   * 提交：先记分，再切题；最后一题直接 finished
+   * 提交答案：判题并锁定，等待用户确认反馈后再切题
    */
-  function submitCurrentAnswer(): 'advanced' | 'finished' | 'rejected' | 'skipped-empty' {
+  function submitCurrentAnswer(): 'feedback' | 'rejected' | 'skipped-empty' {
+    if (isAnswerLocked.value) return 'rejected'
+
     const answer = userAnswer.value.trim()
     if (!answer) return 'skipped-empty'
 
@@ -96,26 +133,23 @@ export function useQuizState(initialWords: string[]) {
     if (!question) return 'rejected'
 
     question.userAnswer = answer
+    const isCorrect = checkQuizAnswer(question, answer)
     question.gradeResult = {
-      isCorrect: checkQuizAnswer(question, answer),
+      isCorrect,
       correctAnswer: getCorrectAnswer(question),
     }
 
-    userAnswer.value = ''
-    answerFeedback.value = null
-
-    if (index >= questions.value.length - 1) {
-      return 'finished'
-    }
-
-    currentQuestionIndex.value = index + 1
-    return 'advanced'
+    answerFeedback.value = isCorrect ? 'correct' : 'wrong'
+    isAnswerLocked.value = true
+    return 'feedback'
   }
 
   /**
-   * 跳过：记为不会，结果页展示释义
+   * 跳过：记为不会，展示正确答案后等待确认
    */
-  function skipQuestion(): 'advanced' | 'finished' | 'rejected' {
+  function skipQuestion(): 'feedback' | 'rejected' {
+    if (isAnswerLocked.value) return 'rejected'
+
     const index = currentQuestionIndex.value
     const question = questions.value[index]
     if (!question) return 'rejected'
@@ -126,8 +160,43 @@ export function useQuizState(initialWords: string[]) {
       correctAnswer: getCorrectAnswer(question),
     }
 
+    answerFeedback.value = 'wrong'
+    isAnswerLocked.value = true
+    return 'feedback'
+  }
+
+  /**
+   * 错题（或跳过）在未达上限时再入队一次，换一种题干形态优先
+   */
+  async function maybeRequeueWrong(question: QuizQuestion): Promise<void> {
+    const skipped = !question.userAnswer.trim()
+    const failed = skipped || !question.gradeResult?.isCorrect
+    if (!failed) return
+    if (question.retryCount >= maxRetries) return
+
+    const next = await buildQuestion(
+      question.word,
+      question.translation,
+      question.retryCount + 1,
+      question.promptMode,
+    )
+    questions.value.push(next)
+  }
+
+  /**
+   * 确认反馈后前进；必要时先把错题追加到队尾
+   */
+  async function acknowledgeFeedback(): Promise<'advanced' | 'finished' | 'rejected'> {
+    if (!isAnswerLocked.value) return 'rejected'
+
+    const index = currentQuestionIndex.value
+    const question = questions.value[index]
+    if (!question?.gradeResult) return 'rejected'
+
+    await maybeRequeueWrong(question)
+
+    clearFeedback()
     userAnswer.value = ''
-    answerFeedback.value = null
 
     if (index >= questions.value.length - 1) {
       return 'finished'
@@ -137,21 +206,34 @@ export function useQuizState(initialWords: string[]) {
     return 'advanced'
   }
 
+  /** 按单词汇总：最终以最后一次作答为准；若曾答对则记为正确 */
   function collectGradedResults(): QuizResult[] {
-    return questions.value
-      .filter((q) => q.gradeResult)
-      .map((q) => {
-        const skipped = !q.userAnswer.trim()
-        return {
-          word: q.word,
-          userAnswer: skipped ? '' : q.userAnswer,
-          correctAnswer: q.gradeResult!.correctAnswer,
-          translation: q.translation,
-          isCorrect: skipped ? false : q.gradeResult!.isCorrect,
-          direction: q.direction,
-          skipped,
-        }
-      })
+    const byWord = new Map<string, QuizResult>()
+
+    for (const q of questions.value) {
+      if (!q.gradeResult) continue
+      const skipped = !q.userAnswer.trim()
+      const next: QuizResult = {
+        word: q.word,
+        userAnswer: skipped ? '' : q.userAnswer,
+        correctAnswer: q.gradeResult.correctAnswer,
+        translation: q.translation,
+        isCorrect: skipped ? false : q.gradeResult.isCorrect,
+        direction: q.direction,
+        skipped,
+      }
+
+      const prev = byWord.get(q.word)
+      if (!prev) {
+        byWord.set(q.word, next)
+        continue
+      }
+      // 后一次覆盖；若此前已对而本次又错（不应出现），仍保留对
+      if (prev.isCorrect && !next.isCorrect) continue
+      byWord.set(q.word, next)
+    }
+
+    return [...byWord.values()]
   }
 
   function setResults(gradedResults: QuizResult[]) {
@@ -164,12 +246,14 @@ export function useQuizState(initialWords: string[]) {
     answerFeedback.value = null
     isAnswerLocked.value = false
 
-    const items = questions.value.map((q) => ({
-      word: q.word,
-      translation: q.translation,
-    }))
+    const items = questions.value
+      .filter((q, i, arr) => arr.findIndex((x) => x.word === q.word) === i)
+      .map((q) => ({
+        word: q.word,
+        translation: q.translation,
+      }))
 
-    questions.value = buildQuestions(items)
+    questions.value = await buildQuestions(items)
     currentQuestionIndex.value = 0
     userAnswer.value = ''
     results.value = []
@@ -186,6 +270,13 @@ export function useQuizState(initialWords: string[]) {
         userAnswer: q.userAnswer,
         gradeResult: q.gradeResult,
       }))
+  }
+
+  /** 当前题是否已「结算」可写入暂停批次（答对，或错/跳且不再重练） */
+  function isQuestionSettled(question: QuizQuestion): boolean {
+    if (!question.gradeResult) return false
+    if (question.gradeResult.isCorrect) return true
+    return question.retryCount >= maxRetries
   }
 
   function setStatus(newStatus: QuizStatus) {
@@ -212,15 +303,19 @@ export function useQuizState(initialWords: string[]) {
     isTesting,
     isGrading,
     isLoading,
+    feedbackCorrectAnswer,
 
     initializeQuiz,
     submitCurrentAnswer,
     skipQuestion,
+    acknowledgeFeedback,
     collectGradedResults,
     setResults,
     retryQuiz,
     getAnsweredQuestions,
+    isQuestionSettled,
     setStatus,
     clearFeedback,
+    buildQuestion,
   }
 }

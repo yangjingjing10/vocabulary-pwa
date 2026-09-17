@@ -187,11 +187,15 @@ async function confirmSave() {
   processingHint.value = 'Matching local dictionary...'
   try {
     const wordList = words.value.map((w) => w.word)
-    const { definitions, matchedLocal, filledRemote, missed } = await resolveDefinitionsForImport(
+    const { definitions, matchedLocal, filledRemote, filledPhrases, missed } = await resolveDefinitionsForImport(
       wordList,
       (phase, done, total, hint) => {
         if (phase === 'local') {
           processingHint.value = `本地词典匹配 ${done}/${total}`
+        } else if (phase === 'phrases') {
+          processingHint.value = hint
+            ? `${hint}（${done}/${total}）`
+            : `补全固定搭配 ${done}/${total}`
         } else {
           processingHint.value = hint
             ? `${hint}（${done}/${total}）`
@@ -218,19 +222,23 @@ async function confirmSave() {
         Object.assign(wordData, enrichDefinition(raw))
         if (wordData.translation) withDefs += 1
       }
+      if (raw?.phrases?.length) {
+        wordData.phrases = raw.phrases
+      }
 
       await addWord(wordData)
     }
 
     emit('save', words.value.map((w) => w.word))
 
+    const phraseNote = filledPhrases > 0 ? `，短语补全 ${filledPhrases}` : ''
     if (missed > 0) {
       showToast(
-        `已保存 ${words.value.length} 词（本地 ${matchedLocal}，API/AI 补全 ${filledRemote}，仍缺 ${missed}）`,
+        `已保存 ${words.value.length} 词（本地 ${matchedLocal}，API/AI 补全 ${filledRemote}${phraseNote}，仍缺 ${missed}）`,
       )
-    } else if (filledRemote > 0) {
+    } else if (filledRemote > 0 || filledPhrases > 0) {
       showToast(
-        `已保存 ${words.value.length} 词（本地 ${matchedLocal}，API/AI 补全 ${filledRemote}）`,
+        `已保存 ${words.value.length} 词（本地 ${matchedLocal}，API/AI 补全 ${filledRemote}${phraseNote}）`,
       )
     } else {
       showToast(`已保存 ${withDefs} 个带释义单词`)

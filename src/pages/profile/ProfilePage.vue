@@ -35,6 +35,7 @@ const emit = defineEmits<{
   openCss: []
   openPromptIndex: []
   openDataBackup: []
+  openRssFeeds: []
 }>()
 const toastMessage = defineModel<string>('toastMessage', { default: '' })
 
@@ -121,6 +122,8 @@ function openSettingPage(type: string) {
     emit('openPromptIndex')
   } else if (type === 'data') {
     emit('openDataBackup')
+  } else if (type === 'rss') {
+    emit('openRssFeeds')
   } else {
     showToast(`${type} settings - Coming soon`)
   }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { getWordsByDate } from '@/db/repositories/words.repository'
+import type { WordPhrase } from '@/db/schema/database'
 import { todayLocalDate } from '@/utils/localDate'
 
 export interface CarouselWord {
@@ -8,6 +9,7 @@ export interface CarouselWord {
   phonetic?: string
   translation?: string
   pos?: string
+  phrases?: WordPhrase[]
 }
 
 const props = withDefaults(
@@ -19,9 +21,15 @@ const props = withDefaults(
   },
 )
 
+const emit = defineEmits<{
+  openDetail: [payload: { words: CarouselWord[]; index: number }]
+}>()
+
 const AUTO_INTERVAL_MS = 4800
 /** 小于该位移视为点按（手机轻微抖动也算点按） */
 const TAP_THRESHOLD = 18
+const MOVE_CANCEL_PX = 12
+const LONG_PRESS_MS = 520
 const SLIDE_MS = 560
 
 const words = ref<CarouselWord[]>([])
@@ -33,8 +41,11 @@ const showMeaning = ref(false)
 const slideDir = ref<'next' | 'prev'>('next')
 
 let autoTimer: ReturnType<typeof setInterval> | null = null
+let longPressTimer: ReturnType<typeof setTimeout> | null = null
 let dragStartX = 0
+let dragStartY = 0
 let isDragging = false
+let longPressFired = false
 /** 触摸结束后忽略合成 mouse 事件，避免点按开关两次导致释义闪一下又没了 */
 let ignoreMouseUntil = 0
 
@@ -86,7 +97,7 @@ const meaningText = computed(() => {
 
 const metaLabel = computed(() => {
   const prefix = isToday.value ? '今日' : '当日'
-  return `${prefix} ${words.value.length} 词`
+  return `${prefix} ${words.value.length} 词 · 点按看释义 · 长按详情`
 })
 
 async function loadWords() {
@@ -98,6 +109,7 @@ async function loadWords() {
       phonetic: item.phonetic || '',
       translation: item.translation || '',
       pos: item.pos || '',
+      phrases: item.phrases || [],
     }))
     currentIndex.value = 0
     showMeaning.value = false
@@ -158,15 +170,53 @@ function stopAutoRotate() {
   }
 }
 
-function onPointerDown(clientX: number) {
+function clearLongPress() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+}
+
+function fireLongPress() {
+  longPressFired = true
+  longPressTimer = null
+  if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+    navigator.vibrate(12)
+  }
+  emit('openDetail', {
+    words: words.value.map((w) => ({ ...w })),
+    index: currentIndex.value,
+  })
+}
+
+function onPointerDown(clientX: number, clientY: number) {
   dragStartX = clientX
+  dragStartY = clientY
   isDragging = true
+  longPressFired = false
   stopAutoRotate()
+  clearLongPress()
+  longPressTimer = setTimeout(fireLongPress, LONG_PRESS_MS)
+}
+
+function onPointerMove(clientX: number, clientY: number) {
+  if (!isDragging || !longPressTimer) return
+  const dx = clientX - dragStartX
+  const dy = clientY - dragStartY
+  if (dx * dx + dy * dy > MOVE_CANCEL_PX * MOVE_CANCEL_PX) {
+    clearLongPress()
+  }
 }
 
 function onPointerUp(clientX: number) {
   if (!isDragging) return
   isDragging = false
+  clearLongPress()
+
+  if (longPressFired) {
+    return
+  }
+
   const deltaX = clientX - dragStartX
 
   if (Math.abs(deltaX) < TAP_THRESHOLD) {
@@ -183,30 +233,49 @@ function onPointerUp(clientX: number) {
 }
 
 function onTouchStart(e: TouchEvent) {
-  onPointerDown(e.touches[0].clientX)
+  onPointerDown(e.touches[0].clientX, e.touches[0].clientY)
+}
+
+function onTouchMove(e: TouchEvent) {
+  onPointerMove(e.touches[0].clientX, e.touches[0].clientY)
 }
 
 function onTouchEnd(e: TouchEvent) {
   onPointerUp(e.changedTouches[0].clientX)
-  // 阻断随后的 mouseup 二次触发
   ignoreMouseUntil = Date.now() + 600
 }
 
 function onTouchCancel() {
   isDragging = false
+  clearLongPress()
   ignoreMouseUntil = Date.now() + 600
-  if (!showMeaning.value) restartAutoRotate()
+  if (!showMeaning.value && !longPressFired) restartAutoRotate()
 }
 
 function onMouseDown(e: MouseEvent) {
   if (Date.now() < ignoreMouseUntil) return
   if (e.button !== 0) return
-  onPointerDown(e.clientX)
+  onPointerDown(e.clientX, e.clientY)
+}
+
+function onMouseMove(e: MouseEvent) {
+  if (Date.now() < ignoreMouseUntil) return
+  onPointerMove(e.clientX, e.clientY)
 }
 
 function onMouseUp(e: MouseEvent) {
   if (Date.now() < ignoreMouseUntil) return
   onPointerUp(e.clientX)
+}
+
+function setIndex(index: number) {
+  if (index < 0 || index >= words.value.length) return
+  currentIndex.value = index
+  showMeaning.value = false
+}
+
+function resumeAuto() {
+  if (!showMeaning.value) restartAutoRotate()
 }
 
 onMounted(() => {
@@ -222,10 +291,13 @@ watch(
 
 onUnmounted(() => {
   stopAutoRotate()
+  clearLongPress()
 })
 
 defineExpose({
   reload: loadWords,
+  setIndex,
+  resumeAuto,
 })
 </script>
 
@@ -243,10 +315,14 @@ defineExpose({
       class="word-strip__scene"
       :class="slideDir === 'next' ? 'is-dir-next' : 'is-dir-prev'"
       @touchstart.passive="onTouchStart"
+      @touchmove.passive="onTouchMove"
       @touchend.prevent="onTouchEnd"
       @touchcancel="onTouchCancel"
       @mousedown="onMouseDown"
+      @mousemove="onMouseMove"
       @mouseup="onMouseUp"
+      @mouseleave="onMouseUp($event)"
+      @contextmenu.prevent
     >
       <TransitionGroup name="word-slide" tag="div" class="word-strip__track">
         <div

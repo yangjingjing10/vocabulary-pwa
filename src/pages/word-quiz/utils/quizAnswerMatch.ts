@@ -45,17 +45,21 @@ export function extractPrimaryGloss(translation: string): string {
 }
 
 /**
- * 展示用提示：中→英只出 1～2 个短义项，避免整段词典原文
+ * 展示用题干文本（兼容旧中→英批次；新题一律用 promptText）
  */
 export function getQuestionPrompt(
-  question: Pick<QuizQuestion, 'word' | 'translation' | 'direction'>,
+  question: Pick<QuizQuestion, 'word' | 'translation' | 'direction'> & {
+    promptText?: string
+  },
 ): string {
+  if (question.promptText?.trim()) {
+    return question.promptText.trim()
+  }
   if (question.direction === 'zh-to-en') {
     const senses = splitCleanSenses(question.translation)
     if (senses.length === 0) {
       return question.translation.replace(/\\n/g, ' ').trim()
     }
-    // 优先短义项，最多两个，总长控制在约 12 字内更舒服
     const picked: string[] = []
     let length = 0
     for (const sense of senses) {
@@ -146,21 +150,20 @@ export async function resolveTranslations(words: string[]): Promise<Map<string, 
   return map
 }
 
+/** @deprecated 已统一为英→中；保留供旧暂停批次兼容读取 */
 export function assignDirectionsFiftyFifty(
   items: { word: string; translation: string }[],
 ): { word: string; translation: string; direction: QuizDirection }[] {
-  const withGloss = items.filter((i) => extractPrimaryGloss(i.translation))
-  const withoutGloss = items.filter((i) => !extractPrimaryGloss(i.translation))
+  return shuffleArray(
+    items.map((i) => ({ ...i, direction: 'en-to-zh' as const })),
+  )
+}
 
-  const shuffled = shuffleArray([...withGloss])
-  const mid = Math.floor(shuffled.length / 2)
-
-  const assigned: { word: string; translation: string; direction: QuizDirection }[] = [
-    ...shuffled.slice(0, mid).map((i) => ({ ...i, direction: 'en-to-zh' as const })),
-    ...shuffled.slice(mid).map((i) => ({ ...i, direction: 'zh-to-en' as const })),
-    // 无释义时只能出英→中，正确答案暂空，判题会失败（极少数）
-    ...withoutGloss.map((i) => ({ ...i, direction: 'en-to-zh' as const })),
-  ]
-
-  return shuffleArray(assigned)
+/** 全部英→中出题 */
+export function assignEnToZh(
+  items: { word: string; translation: string }[],
+): { word: string; translation: string; direction: QuizDirection }[] {
+  return shuffleArray(
+    items.map((i) => ({ ...i, direction: 'en-to-zh' as const })),
+  )
 }

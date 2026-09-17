@@ -16,6 +16,7 @@ export interface Word {
   phonetic: string
   pos: string
   translation: string
+  phrases: { phrase: string; translation: string }[]
 }
 
 export interface DayData {
@@ -92,6 +93,7 @@ export function useVocabularyData() {
         phonetic: w.phonetic || '',
         pos: w.pos || '',
         translation: w.translation || '',
+        phrases: Array.isArray(w.phrases) ? w.phrases : [],
       }))
 
     const dayArticles = await getArticlesByDate(dateStr)

@@ -106,6 +106,29 @@ export function getRemainingWrongWords(state: ChoicePracticeState): string[] {
   return state.pendingWrongWords.filter((w) => !practiced.has(normalize(w)))
 }
 
+export async function getAllChoicePracticeStates(): Promise<ChoicePracticeState[]> {
+  const db = await initDatabase()
+  return db.getAll('choicePracticeStates')
+}
+
+/** 汇总多日尚未消化的错题（可按日期过滤） */
+export async function collectPendingWrongWords(options?: {
+  startDate?: string
+  endDate?: string
+}): Promise<string[]> {
+  const states = await getAllChoicePracticeStates()
+  const start = options?.startDate?.trim() || ''
+  const end = options?.endDate?.trim() || ''
+
+  const pooled: string[] = []
+  for (const state of states) {
+    if (start && state.date < start) continue
+    if (end && state.date > end) continue
+    pooled.push(...getRemainingWrongWords(state))
+  }
+  return uniquePreserveOrder(pooled)
+}
+
 export async function clearChoicePracticeStates(): Promise<void> {
   const db = await initDatabase()
   await db.clear('choicePracticeStates')

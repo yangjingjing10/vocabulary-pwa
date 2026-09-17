@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { QuizQuestion } from '../types/quiz'
-import { getQuestionPrompt } from '../utils/quizAnswerMatch'
+import type { AnswerFeedback, QuizQuestion } from '../types/quiz'
 import WordCarousel from './WordCarousel.vue'
-import WordContextSentences from './WordContextSentences.vue'
 
 interface Props {
   question: QuizQuestion
@@ -12,12 +10,16 @@ interface Props {
   totalQuestions: number
   currentIndex: number
   modelValue: string
+  answerFeedback: AnswerFeedback
+  isAnswerLocked: boolean
+  feedbackCorrectAnswer: string
 }
 
 interface Emits {
   (e: 'update:modelValue', value: string): void
   (e: 'next'): void
   (e: 'skip'): void
+  (e: 'acknowledge'): void
 }
 
 const props = defineProps<Props>()
@@ -30,20 +32,35 @@ const userAnswer = computed({
 
 const carouselWords = computed(() =>
   props.questions.map((q) => ({
-    word: getQuestionPrompt(q),
-    isChinese: q.direction === 'zh-to-en',
+    word: q.word,
+    promptMode: q.promptMode,
+    promptText: q.promptText,
   })),
 )
 
 const placeholder = computed(() =>
-  props.question.direction === 'zh-to-en'
-    ? '输入英文单词回车确认，空回车跳过'
+  props.isAnswerLocked
+    ? '回车继续下一题'
     : '输入中文释义回车确认，空回车跳过',
 )
+
+const feedbackText = computed(() => {
+  if (props.answerFeedback === 'correct') return '答对了'
+  if (props.answerFeedback === 'wrong') {
+    const skipped = !props.question.userAnswer.trim()
+    return skipped ? '已跳过' : '再记一下'
+  }
+  return ''
+})
 
 function handleKeyDown(event: KeyboardEvent) {
   if (event.key !== 'Enter') return
   event.preventDefault()
+
+  if (props.isAnswerLocked) {
+    emit('acknowledge')
+    return
+  }
 
   if (userAnswer.value.trim()) {
     emit('next')
@@ -64,12 +81,23 @@ function handleKeyDown(event: KeyboardEvent) {
       :current-index="currentIndex"
     />
 
-    <div class="quiz-example-slot">
-      <WordContextSentences
-        v-if="question.direction === 'en-to-zh'"
-        :word="question.word"
-        :max-initial-display="2"
-      />
+    <div
+      v-if="isAnswerLocked"
+      class="quiz-feedback"
+      :class="answerFeedback === 'correct' ? 'is-correct' : 'is-wrong'"
+      role="status"
+    >
+      <div class="quiz-feedback__title">{{ feedbackText }}</div>
+      <div class="quiz-feedback__answer">
+        {{ feedbackCorrectAnswer }}
+      </div>
+      <button
+        type="button"
+        class="quiz-feedback__continue"
+        @click="emit('acknowledge')"
+      >
+        继续
+      </button>
     </div>
 
     <div class="quiz-input-panel">
@@ -79,7 +107,12 @@ function handleKeyDown(event: KeyboardEvent) {
           :value="userAnswer"
           type="text"
           class="quiz-input"
+          :class="{
+            'is-correct': answerFeedback === 'correct',
+            'is-wrong': answerFeedback === 'wrong',
+          }"
           :placeholder="placeholder"
+          :readonly="isAnswerLocked"
           autocomplete="off"
           enterkeyhint="done"
           autofocus

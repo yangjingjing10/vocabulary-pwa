@@ -172,7 +172,7 @@ async function handleFileChange(event: Event) {
       <section class="data-backup-card">
         <h2>导出备份</h2>
         <p class="data-backup-card__desc">
-          导出词库、文章、测验记录、API/提示词配置、个人资料、壁纸与字体等。离线大词库体积很大，不包含在备份中，恢复后会自动重建。
+          导出词库、文章、测验记录、API/提示词配置、个人资料、壁纸与字体等。离线大词库（释义/短语/形近/例句）体积很大，不包含在备份中，恢复后会自动重建。
         </p>
         <button
           class="data-backup-action"

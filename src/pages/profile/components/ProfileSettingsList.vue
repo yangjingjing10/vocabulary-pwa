@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ChevronRight, Database, Smartphone, WandSparkles } from 'lucide-vue-next'
+import { ChevronRight, Database, Newspaper, Smartphone, WandSparkles } from 'lucide-vue-next'
 
 interface SettingItem {
-  type: 'data' | 'prompt' | 'pwa'
+  type: 'data' | 'prompt' | 'rss' | 'pwa'
   title: string
   description: string
   badge: string
@@ -33,6 +33,15 @@ const settings: SettingItem[] = [
     badgeTone: 'slate',
     icon: WandSparkles,
     iconTone: 'slate'
+  },
+  {
+    type: 'rss',
+    title: '新闻源 RSS',
+    description: '文章生成用的真实新闻标题源（BBC / NPR / Guardian）',
+    badge: '预置',
+    badgeTone: 'slate',
+    icon: Newspaper,
+    iconTone: 'emerald'
   },
   {
     type: 'pwa',

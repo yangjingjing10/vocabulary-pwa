@@ -1,10 +1,11 @@
 import CryptoJS from 'crypto-js'
-import type { ApiConfig, DictionaryApiConfig } from '@/db/schema/database'
+import type { ApiConfig, DictionaryApiConfig, WordPhrase } from '@/db/schema/database'
 import { getEnabledDictionaryApiConfigs } from '@/db/repositories/dictionary-api-config.repository'
 import { getApiConfig } from '@/db/repositories/api-config.repository'
 import {
   ensureLocalDictionary,
   lookupLocalDictionary,
+  lookupLocalPhrases,
 } from '@/services/local-dictionary.service'
 
 export interface WordDefinition {
@@ -12,6 +13,7 @@ export interface WordDefinition {
   phonetic?: string
   pos?: string
   translation?: string
+  phrases?: WordPhrase[]
   source: string
 }
 
@@ -417,17 +419,104 @@ export async function queryWordDefinition(word: string): Promise<WordDefinition 
 }
 
 /**
+ * 批量用 LLM 补固定搭配（本地短语库未命中时）
+ */
+async function queryFallbackLLMPhrasesBatch(words: string[]): Promise<Map<string, WordPhrase[]>> {
+  const results = new Map<string, WordPhrase[]>()
+  if (words.length === 0) return results
+
+  const apiConfig = await getReadyLlmConfig()
+  if (!apiConfig) {
+    console.warn('[Dictionary] No LLM config for phrase fill')
+    return results
+  }
+
+  const CHUNK = 12
+  for (let start = 0; start < words.length; start += CHUNK) {
+    const chunk = words.slice(start, start + CHUNK)
+    try {
+      const prompt = `为下列英语单词各提供 3～5 条常用固定搭配或短语动词（不要纯复合名词如 comic book）。
+只返回 JSON 对象：键为单词，值为数组，每项含 phrase（英文搭配）与 translation（简短中文）。不要 markdown。
+示例：{"look":[{"phrase":"look after","translation":"照顾"},{"phrase":"look forward to","translation":"期待"}]}
+
+单词列表：
+${chunk.map((w, i) => `${i + 1}. ${w}`).join('\n')}`
+
+      const response = await fetch(`${normalizeBaseUrl(apiConfig.baseUrl)}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiConfig.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: apiConfig.textModel,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3,
+          max_tokens: Math.min(2500, 160 * chunk.length),
+        }),
+      })
+
+      if (!response.ok) {
+        console.error(`[Dictionary] phrase batch HTTP ${response.status}`)
+        continue
+      }
+
+      const data = await response.json()
+      const content = data.choices?.[0]?.message?.content?.trim() || ''
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) {
+        console.warn('[Dictionary] phrase batch non-JSON')
+        continue
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>
+      for (const word of chunk) {
+        const raw = parsed[word] ?? parsed[word.toLowerCase()]
+        const phrases = normalizeAiPhrases(raw)
+        if (phrases.length) results.set(word, phrases)
+      }
+    } catch (error) {
+      console.error('[Dictionary] phrase batch failed:', error)
+    }
+  }
+
+  return results
+}
+
+function normalizeAiPhrases(raw: unknown): WordPhrase[] {
+  if (!Array.isArray(raw)) return []
+  const out: WordPhrase[] = []
+  const seen = new Set<string>()
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const phrase = String((item as { phrase?: string }).phrase || '').trim().toLowerCase()
+    const translation = String((item as { translation?: string }).translation || '').trim()
+    if (!phrase || !translation || !/\s/.test(phrase)) continue
+    if (seen.has(phrase)) continue
+    seen.add(phrase)
+    out.push({
+      phrase,
+      translation: translation.length > 80 ? `${translation.slice(0, 77)}…` : translation,
+    })
+    if (out.length >= 5) break
+  }
+  return out
+}
+
+/**
  * 导入专用：先本地匹配，收集未命中后再补全
  * - 有可用词典 API：逐词试词典，失败再用 LLM
  * - 无词典 API：未命中整批直接走用户配置的 LLM
+ * - 短语：本地反查优先；没有则用 LLM 补固定搭配
  */
 export async function resolveDefinitionsForImport(
   words: string[],
-  onProgress?: (phase: 'local' | 'remote', done: number, total: number, hint?: string) => void,
+  onProgress?: (phase: 'local' | 'remote' | 'phrases', done: number, total: number, hint?: string) => void,
 ): Promise<{
   definitions: Map<string, WordDefinition>
   matchedLocal: number
   filledRemote: number
+  filledPhrases: number
   missed: number
 }> {
   const unique = [...new Set(words.map((w) => w.trim().toLowerCase()).filter(Boolean))]
@@ -440,69 +529,112 @@ export async function resolveDefinitionsForImport(
     const word = unique[i]
     onProgress?.('local', i + 1, unique.length, word)
     const local = await lookupLocalDictionary(word)
+    const phrases = await lookupLocalPhrases(word)
     if (local?.translation?.trim()) {
       definitions.set(word, {
         word: local.word,
         phonetic: local.phonetic || undefined,
         pos: local.pos || undefined,
         translation: local.translation,
+        phrases: phrases.length ? phrases : undefined,
         source: 'local-ecdict',
       })
     } else {
       missing.push(word)
+      if (phrases.length) {
+        definitions.set(word, {
+          word,
+          phrases,
+          source: 'local-ecdict-phrases',
+        })
+      }
     }
   }
 
-  const matchedLocal = definitions.size
-
-  if (missing.length === 0) {
-    return { definitions, matchedLocal, filledRemote: 0, missed: 0 }
-  }
-
-  const configs = await getUsableDictionaryConfigs()
+  const matchedLocal = [...definitions.values()].filter((d) => d.source === 'local-ecdict').length
   let filledRemote = 0
 
-  if (configs.length === 0) {
-    console.log(`[Dictionary] ${missing.length} unmatched, filling via LLM API`)
-    onProgress?.('remote', 0, missing.length, 'AI 批量补全中...')
-    const llmMap = await queryFallbackLLMBatch(missing)
-    for (const [word, def] of llmMap) {
-      definitions.set(word, def)
-      filledRemote += 1
-    }
-    onProgress?.('remote', missing.length, missing.length)
-  } else {
-    console.log(`[Dictionary] ${missing.length} unmatched, trying dictionary APIs then LLM`)
-    const stillMissing: string[] = []
+  if (missing.length > 0) {
+    const configs = await getUsableDictionaryConfigs()
 
-    for (let i = 0; i < missing.length; i++) {
-      const word = missing[i]
-      onProgress?.('remote', i + 1, missing.length, word)
-      let hit: WordDefinition | null = null
-      for (const config of configs) {
-        hit = await queryDictionaryProvider(word, config)
-        if (hit?.translation) break
-      }
-      if (hit?.translation) {
-        definitions.set(word, hit)
-        filledRemote += 1
-      } else {
-        stillMissing.push(word)
-      }
-    }
-
-    if (stillMissing.length > 0) {
-      onProgress?.('remote', missing.length, missing.length, 'AI 补全剩余单词...')
-      const llmMap = await queryFallbackLLMBatch(stillMissing)
+    if (configs.length === 0) {
+      console.log(`[Dictionary] ${missing.length} unmatched, filling via LLM API`)
+      onProgress?.('remote', 0, missing.length, 'AI 批量补全中...')
+      const llmMap = await queryFallbackLLMBatch(missing)
       for (const [word, def] of llmMap) {
-        definitions.set(word, def)
+        const prev = definitions.get(word)
+        definitions.set(word, {
+          ...def,
+          phrases: prev?.phrases,
+        })
         filledRemote += 1
+      }
+      onProgress?.('remote', missing.length, missing.length)
+    } else {
+      console.log(`[Dictionary] ${missing.length} unmatched, trying dictionary APIs then LLM`)
+      const stillMissing: string[] = []
+
+      for (let i = 0; i < missing.length; i++) {
+        const word = missing[i]
+        onProgress?.('remote', i + 1, missing.length, word)
+        let hit: WordDefinition | null = null
+        for (const config of configs) {
+          hit = await queryDictionaryProvider(word, config)
+          if (hit?.translation) break
+        }
+        if (hit?.translation) {
+          const prev = definitions.get(word)
+          definitions.set(word, {
+            ...hit,
+            phrases: prev?.phrases,
+          })
+          filledRemote += 1
+        } else {
+          stillMissing.push(word)
+        }
+      }
+
+      if (stillMissing.length > 0) {
+        onProgress?.('remote', missing.length, missing.length, 'AI 补全剩余单词...')
+        const llmMap = await queryFallbackLLMBatch(stillMissing)
+        for (const [word, def] of llmMap) {
+          const prev = definitions.get(word)
+          definitions.set(word, {
+            ...def,
+            phrases: prev?.phrases,
+          })
+          filledRemote += 1
+        }
       }
     }
   }
 
-  const missed = unique.length - definitions.size
-  return { definitions, matchedLocal, filledRemote, missed }
+  // 本地没有短语的词，用 AI 补固定搭配（需已配置 LLM）
+  const needPhrases = unique.filter((w) => !(definitions.get(w)?.phrases?.length))
+  let filledPhrases = 0
+  if (needPhrases.length > 0) {
+    onProgress?.('phrases', 0, needPhrases.length, 'AI 补全固定搭配...')
+    const phraseMap = await queryFallbackLLMPhrasesBatch(needPhrases)
+    for (const [word, phrases] of phraseMap) {
+      const prev = definitions.get(word)
+      if (prev) {
+        definitions.set(word, { ...prev, phrases })
+      } else {
+        definitions.set(word, { word, phrases, source: 'llm-phrases' })
+      }
+      filledPhrases += 1
+    }
+    onProgress?.('phrases', needPhrases.length, needPhrases.length)
+  }
+
+  const missed = unique.filter((w) => !definitions.get(w)?.translation).length
+  return {
+    definitions,
+    matchedLocal,
+    filledRemote,
+    filledPhrases,
+    missed,
+  }
 }
 
 export async function queryWordDefinitions(words: string[]): Promise<Map<string, WordDefinition>> {

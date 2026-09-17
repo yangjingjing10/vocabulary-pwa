@@ -9,7 +9,7 @@ export const BACKUP_VERSION = 1
 const QUIZ_STORAGE_KEY = 'quiz_current_batch'
 const FONT_SIZE_STORAGE_KEY = 'app_font_size'
 
-/** 用户数据表（排除可重建的离线大词库 localDict / localDictMeta） */
+/** 用户数据表（排除可重建的离线大词库 localDict / localDictMeta / localPhraseIndex / localLookalikeIndex / localExampleIndex） */
 const MAIN_USER_STORES = [
   'words',
   'apiConfig',
@@ -172,8 +172,14 @@ export async function exportAllData(): Promise<BackupPayload> {
       app_font_size: localStorage.getItem(FONT_SIZE_STORAGE_KEY),
     },
     meta: {
-      excludedStores: ['localDict', 'localDictMeta'],
-      note: '本地离线大词库未包含在备份中，恢复后会自动重建。',
+      excludedStores: [
+        'localDict',
+        'localDictMeta',
+        'localPhraseIndex',
+        'localLookalikeIndex',
+        'localExampleIndex',
+      ],
+      note: '本地离线大词库、短语、形近与例句索引未包含在备份中，恢复后会自动重建。',
     },
   }
 }

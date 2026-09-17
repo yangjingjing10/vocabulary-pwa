@@ -3,6 +3,8 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { registerSW } from 'virtual:pwa-register'
 
 import AiArticlePage from '@/pages/ai-article/AiArticlePage.vue'
+import ArticleHubPage from '@/pages/ai-article/ArticleHubPage.vue'
+import NewsBriefPage from '@/pages/ai-article/NewsBriefPage.vue'
 import ArticleReadPage from '@/pages/article-read/ArticleReadPage.vue'
 import HomePage from '@/pages/HomePage.vue'
 import ProfilePage, { type ProfileUser } from '@/pages/profile/ProfilePage.vue'
@@ -14,6 +16,7 @@ import PromptConfigIndexPage from '@/pages/profile/prompt/PromptConfigIndexPage.
 import ArticlePromptConfigPage from '@/pages/profile/prompt/ArticlePromptConfigPage.vue'
 import QuizPromptConfigPage from '@/pages/profile/prompt/QuizPromptConfigPage.vue'
 import DataBackupPage from '@/pages/profile/data/DataBackupPage.vue'
+import RssFeedsPage from '@/pages/profile/RssFeedsPage.vue'
 import WordImportPage from '@/pages/word-import/WordImportPage.vue'
 import VocabularyBookPage from '@/pages/vocabulary-book/VocabularyBookPage.vue'
 import WordQuizPage from '@/pages/word-quiz/WordQuizPage.vue'
@@ -23,7 +26,12 @@ import { wallpaperService } from '@/services/wallpaper.service'
 import { fontService } from '@/services/font.service'
 import { ensureLocalDictionary } from '@/services/local-dictionary.service'
 import { articleGenerationService } from '@/services/article-generation.service'
+import { mixYesterdayWrongWords } from '@/services/practice-mix.service'
+import { peekUnfinishedQuizBatch } from '@/pages/word-quiz/composables/useQuizPause'
 import { getUserProfile } from '@/db/repositories/user-profile.repository'
+import type { ArticleGenPrefs } from '@/constants/article-gen-prefs'
+import { loadArticleGenPrefs } from '@/constants/article-gen-prefs'
+import { todayLocalDate } from '@/utils/localDate'
 
 import '@/styles/pages/home-page.css'
 
@@ -44,10 +52,15 @@ onMounted(async () => {
 
   unsubscribeArticleGen = articleGenerationService.subscribe((event) => {
     // 只在不在文章页时弹全局提醒，避免重复打扰
-    if (activeView.value === 'article' || activeView.value === 'article-read') return
+    if (activeView.value === 'article' || activeView.value === 'article-read' || activeView.value === 'article-hub' || activeView.value === 'news-brief') return
 
     if (event.status === 'success' && event.article) {
-      showAppToast(`文章已生成：${event.article.title}`, event.article.id)
+      const done = articleGenerationService.batchProgress.value.done
+      const msg =
+        done > 1
+          ? `已生成 ${done} 篇主题短文（最新：${event.article.title}）`
+          : `文章已生成：${event.article.title}`
+      showAppToast(msg, event.article.id)
     } else if (event.status === 'error') {
       showAppToast(`文章生成失败：${event.error || '请重试'}`, null, true)
     }
@@ -58,17 +71,23 @@ onUnmounted(() => {
   unsubscribeArticleGen?.()
 })
 
-type View = 'study' | 'profile' | 'api' | 'css-index' | 'css-wallpaper' | 'css-font' | 'prompt-index' | 'article-prompt' | 'quiz-prompt' | 'data-backup' | 'import' | 'vocabulary' | 'article' | 'article-read' | 'word-quiz' | 'choice-quiz'
+type View = 'study' | 'profile' | 'api' | 'css-index' | 'css-wallpaper' | 'css-font' | 'prompt-index' | 'article-prompt' | 'quiz-prompt' | 'data-backup' | 'rss-feeds' | 'import' | 'vocabulary' | 'article-hub' | 'article' | 'news-brief' | 'article-read' | 'word-quiz' | 'choice-quiz'
 
 const activeView = ref<View>('study')
 const importType = ref<'camera' | 'upload' | 'manual'>('camera')
 const importReturnView = ref<'study' | 'vocabulary'>('vocabulary')
+const articleReturnView = ref<'study' | 'vocabulary'>('study')
 const selectedWords = ref<string[]>([])
+const articleGenPrefs = ref<ArticleGenPrefs>(loadArticleGenPrefs())
 const priorityWords = ref<string[]>([])
 const selectedDate = ref('')
 /** 进阶首批可补全；学习记录「生成」续练只出剩余错题 */
 const choiceFillFromPool = ref(true)
 const selectedArticleId = ref('')
+/** 默写是否为复习模式（对搁错留） */
+const quizReviewMode = ref(false)
+/** 默写结束后回到哪 */
+const quizReturnView = ref<'study' | 'vocabulary'>('vocabulary')
 const profileUser = ref<ProfileUser>({
   name: 'Vocabulary Learner',
   avatar: 'https://placehold.co/120x120/334155/ffffff?text=User',
@@ -125,9 +144,18 @@ function backFromImport() {
 function generateArticle(words: string[], date = '') {
   selectedWords.value = words
   selectedDate.value = date
-  // 先清会话再进页，避免旧文章残留；生成由页面/服务后台执行
+  articleReturnView.value = activeView.value === 'vocabulary' ? 'vocabulary' : 'study'
+  activeView.value = 'article-hub'
+}
+
+function startAiFromHub(prefs: ArticleGenPrefs) {
+  articleGenPrefs.value = prefs
   articleGenerationService.clearSession()
   activeView.value = 'article'
+}
+
+function startNewsFromHub() {
+  activeView.value = 'news-brief'
 }
 
 function openArticleRead(articleId: string) {
@@ -135,18 +163,104 @@ function openArticleRead(articleId: string) {
   activeView.value = 'article-read'
 }
 
-function startQuizFromVocabulary(words: string[], date = '') {
-  selectedWords.value = words
+function backFromArticleFlow() {
+  activeView.value = articleReturnView.value
+}
+
+async function startQuizFromVocabulary(words: string[], date = '') {
+  const practiceDate = date || todayLocalDate()
+  try {
+    const mixed = await mixYesterdayWrongWords(practiceDate, words)
+    if (mixed.words.length === 0) {
+      activeView.value = 'vocabulary'
+      return
+    }
+    selectedWords.value = mixed.words
+  } catch (error) {
+    console.error('Failed to mix yesterday wrong words:', error)
+    if (words.length === 0) {
+      activeView.value = 'vocabulary'
+      return
+    }
+    selectedWords.value = words
+  }
   priorityWords.value = []
-  selectedDate.value = date
+  quizReviewMode.value = false
+  quizReturnView.value = 'vocabulary'
+  selectedDate.value = practiceDate
   activeView.value = 'word-quiz'
 }
 
-function startPractice(words: string[]) {
+async function startQuizFromHome(words: string[], date = '') {
+  const practiceDate = date || todayLocalDate()
+  try {
+    const mixed = await mixYesterdayWrongWords(practiceDate, words)
+    if (mixed.words.length === 0) {
+      // 无词可练时打开单词本，避免空白测验
+      activeView.value = 'vocabulary'
+      return
+    }
+    selectedWords.value = mixed.words
+  } catch (error) {
+    console.error('Failed to mix yesterday wrong words:', error)
+    if (words.length === 0) {
+      activeView.value = 'vocabulary'
+      return
+    }
+    selectedWords.value = words
+  }
+  priorityWords.value = []
+  quizReviewMode.value = false
+  quizReturnView.value = 'study'
+  selectedDate.value = practiceDate
+  activeView.value = 'word-quiz'
+}
+
+async function startPractice(words: string[]) {
+  const practiceDate = selectedDate.value || todayLocalDate()
+  try {
+    const mixed = await mixYesterdayWrongWords(practiceDate, words)
+    selectedWords.value = mixed.words
+  } catch (error) {
+    console.error('Failed to mix yesterday wrong words:', error)
+    selectedWords.value = words
+  }
+  priorityWords.value = []
+  quizReviewMode.value = false
+  quizReturnView.value = 'study'
+  if (!selectedDate.value) selectedDate.value = practiceDate
+  activeView.value = 'word-quiz'
+}
+
+function startReview(words: string[], date = '') {
+  if (words.length === 0) return
   selectedWords.value = words
   priorityWords.value = []
-  // 保留 selectedDate（从文章页回来可能已有日期）
+  quizReviewMode.value = true
+  quizReturnView.value = 'study'
+  selectedDate.value = date || todayLocalDate()
   activeView.value = 'word-quiz'
+}
+
+/** 续未完成的复习：进入测验页后由暂停批次弹续测对话框 */
+function resumeReview(date = '') {
+  const practiceDate = date || todayLocalDate()
+  const unfinished = peekUnfinishedQuizBatch(practiceDate, 'review')
+  if (!unfinished) {
+    // 没有进度则回落到新建复习（由首页再点）
+    return
+  }
+  selectedWords.value = unfinished.batch.words.map((w) => w.word).filter(Boolean)
+  priorityWords.value = []
+  quizReviewMode.value = true
+  quizReturnView.value = 'study'
+  selectedDate.value = practiceDate
+  activeView.value = 'word-quiz'
+}
+
+function backFromQuiz() {
+  activeView.value = quizReturnView.value
+  quizReviewMode.value = false
 }
 
 function startAdvancedPractice(words: string[], wrongWords: string[] = [], date = '') {
@@ -182,7 +296,9 @@ async function reloadProfileAfterRestore() {
     active-tab="study"
     @navigate="navigate"
     @open-vocabulary="activeView = 'vocabulary'"
-    @start-quiz="startQuizFromVocabulary"
+    @start-quiz="startQuizFromHome"
+    @start-review="startReview"
+    @resume-review="resumeReview"
     @open-article="openArticleRead"
     @generate-article="generateArticle"
   />
@@ -195,6 +311,7 @@ async function reloadProfileAfterRestore() {
     @open-css="activeView = 'css-index'"
     @open-prompt-index="activeView = 'prompt-index'"
     @open-data-backup="activeView = 'data-backup'"
+    @open-rss-feeds="activeView = 'rss-feeds'"
   />
   <ApiSettingsPage v-else-if="activeView === 'api'" @back="activeView = 'profile'" />
   <CssIndexPage v-else-if="activeView === 'css-index'" @back="activeView = 'profile'" @navigate-to-wallpaper="activeView = 'css-wallpaper'" @navigate-to-font="activeView = 'css-font'" />
@@ -208,6 +325,7 @@ async function reloadProfileAfterRestore() {
     @back="activeView = 'profile'"
     @restored="reloadProfileAfterRestore"
   />
+  <RssFeedsPage v-else-if="activeView === 'rss-feeds'" @back="activeView = 'profile'" />
   <WordImportPage v-else-if="activeView === 'import'" :import-type="importType" @back="backFromImport" @save="saveWords" />
   <VocabularyBookPage
     v-else-if="activeView === 'vocabulary'"
@@ -218,13 +336,40 @@ async function reloadProfileAfterRestore() {
     @open-choice-quiz="openChoiceQuiz"
     @open-import="openImport"
   />
-  <AiArticlePage v-else-if="activeView === 'article'" :selected-words="selectedWords" @back="activeView = 'vocabulary'" @start-practice="startPractice" />
-  <ArticleReadPage v-else-if="activeView === 'article-read'" :article-id="selectedArticleId" @back="activeView = 'vocabulary'" />
+  <ArticleHubPage
+    v-else-if="activeView === 'article-hub'"
+    :words="selectedWords"
+    :date="selectedDate"
+    @back="backFromArticleFlow"
+    @start-ai="startAiFromHub"
+    @start-news="startNewsFromHub"
+    @open-article="openArticleRead"
+  />
+  <AiArticlePage
+    v-else-if="activeView === 'article'"
+    :selected-words="selectedWords"
+    :date="selectedDate"
+    :gen-prefs="articleGenPrefs"
+    @back="activeView = 'article-hub'"
+    @start-practice="startPractice"
+  />
+  <NewsBriefPage
+    v-else-if="activeView === 'news-brief'"
+    :date="selectedDate"
+    :words="selectedWords"
+    @back="activeView = 'article-hub'"
+  />
+  <ArticleReadPage
+    v-else-if="activeView === 'article-read'"
+    :article-id="selectedArticleId"
+    @back="activeView = 'article-hub'"
+  />
   <WordQuizPage
     v-else-if="activeView === 'word-quiz'"
     :words="selectedWords"
     :date="selectedDate"
-    @back="activeView = 'vocabulary'"
+    :review-mode="quizReviewMode"
+    @back="backFromQuiz"
     @advanced-practice="startAdvancedPractice"
   />
   <ChoiceQuizPage

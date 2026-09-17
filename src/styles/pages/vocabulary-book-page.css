@@ -374,6 +374,32 @@
   font-weight: 700;
 }
 
+.vocab-word__phrases {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vocab-word__phrases li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 0.625rem;
+  line-height: 1.4;
+}
+
+.vocab-word__phrase {
+  font-weight: 600;
+  color: var(--app-font-color, #0f172a);
+}
+
+.vocab-word__phrase-tr {
+  color: var(--app-font-color-muted, #64748b);
+}
+
 .vocab-word__audio {
   display: grid;
   place-items: center;

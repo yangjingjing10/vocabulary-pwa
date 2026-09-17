@@ -5,6 +5,7 @@ import { ArrowLeft, Loader2, Volume2, X, RefreshCw, Sparkles, Pencil } from 'luc
 import { getArticle, getArticlesByDate, deleteArticle } from '@/db/repositories/articles.repository'
 import type { Article } from '@/db/schema/database'
 import ParagraphTranslation from './components/ParagraphTranslation.vue'
+import ArticleSources from './components/ArticleSources.vue'
 import DrawingToolbar from './components/drawing/DrawingToolbar.vue'
 import ArticleDeleteConfirmModal from './components/ArticleDeleteConfirmModal.vue'
 import { useDrawingSession } from './composables/useDrawingSession'
@@ -12,6 +13,7 @@ import { useArticleLongPress } from './composables/useArticleLongPress'
 import {
   ensureLocalDictionary,
   lookupLocalDictionary,
+  lookupLocalPhrases,
 } from '@/services/local-dictionary.service'
 import { articleGenerationService } from '@/services/article-generation.service'
 import { speakText } from '@/services/speech.service'
@@ -110,6 +112,7 @@ async function regenerateArticle() {
   const article = await articleGenerationService.start(words, {
     session: 'none',
     date: source.date,
+    mode: 'batch-theme',
   })
   if (!pageAlive) return
 
@@ -171,6 +174,7 @@ async function fetchDefinition(word: string) {
 
   try {
     await ensureLocalDictionary()
+    const phrases = await lookupLocalPhrases(word)
     const local = await lookupLocalDictionary(word)
     if (local) {
       wordDefinition.value = {
@@ -181,6 +185,7 @@ async function fetchDefinition(word: string) {
           definition: local.translation,
           example: '',
         }],
+        phrases,
       }
       return
     }
@@ -196,7 +201,8 @@ async function fetchDefinition(word: string) {
           partOfSpeech: m.partOfSpeech,
           definition: m.definitions[0].definition,
           example: m.definitions[0].example
-        }))
+        })),
+        phrases,
       }
     } else {
       wordDefinition.value = {
@@ -206,7 +212,8 @@ async function fetchDefinition(word: string) {
           partOfSpeech: '',
           definition: '本地词库与在线词典均未找到该词。',
           example: ''
-        }]
+        }],
+        phrases,
       }
     }
   } catch (error) {
@@ -217,7 +224,8 @@ async function fetchDefinition(word: string) {
         partOfSpeech: '',
         definition: '查词失败，请稍后重试。',
         example: ''
-      }]
+      }],
+      phrases: [],
     }
   } finally {
     isLoadingDefinition.value = false
@@ -336,6 +344,12 @@ function formatTime(timestamp: number) {
             @word-click="handleWordClick"
           />
 
+          <ArticleSources
+            v-if="article.sources?.length || article.theme"
+            :sources="article.sources || []"
+            :theme="article.theme"
+          />
+
           <div v-if="index < articles.length - 1" class="article-separator"></div>
         </article>
       </div>
@@ -386,6 +400,23 @@ function formatTime(timestamp: number) {
               <span class="definition-card__pos">{{ meaning.partOfSpeech }}</span>
               <p class="definition-card__def">{{ meaning.definition }}</p>
               <p v-if="meaning.example" class="definition-card__example">"{{ meaning.example }}"</p>
+            </div>
+
+            <div
+              v-if="wordDefinition.phrases?.length"
+              class="definition-card__phrases"
+            >
+              <h4 class="definition-card__phrases-title">相关短语</h4>
+              <ul class="definition-card__phrases-list">
+                <li
+                  v-for="item in wordDefinition.phrases"
+                  :key="item.phrase"
+                  class="definition-card__phrase-item"
+                >
+                  <span class="definition-card__phrase">{{ item.phrase }}</span>
+                  <span class="definition-card__phrase-tr">{{ item.translation }}</span>
+                </li>
+              </ul>
             </div>
           </div>
         </div>

@@ -132,6 +132,27 @@ export async function initDatabase() {
           db.createObjectStore('choicePracticeStates', { keyPath: 'id' })
         }
       }
+
+      // Version 14: ECDICT 短语/固定搭配反查索引
+      if (oldVersion < 14) {
+        if (!db.objectStoreNames.contains('localPhraseIndex')) {
+          db.createObjectStore('localPhraseIndex', { keyPath: 'word' })
+        }
+      }
+
+      // Version 15: ECDICT 形近词索引（adapt/adopt/adept）
+      if (oldVersion < 15) {
+        if (!db.objectStoreNames.contains('localLookalikeIndex')) {
+          db.createObjectStore('localLookalikeIndex', { keyPath: 'word' })
+        }
+      }
+
+      // Version 16: Tatoeba 例句索引
+      if (oldVersion < 16) {
+        if (!db.objectStoreNames.contains('localExampleIndex')) {
+          db.createObjectStore('localExampleIndex', { keyPath: 'word' })
+        }
+      }
     },
     blocked() {
       console.warn('[DB] 升级被阻塞：请关闭其它标签页后刷新')

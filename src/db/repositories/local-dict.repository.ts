@@ -38,9 +38,53 @@ export async function getLocalLookalikesForWord(word: string): Promise<LocalLook
 
 export async function getLocalExamplesForWord(word: string): Promise<LocalExampleItem[]> {
   const db = await initDatabase()
-  if (!db.objectStoreNames.contains('localExampleIndex')) return []
-  const entry = await db.get('localExampleIndex', word.toLowerCase().trim())
-  return entry?.examples ?? []
+  const key = word.toLowerCase().trim()
+  if (!key) return []
+
+  const pack = db.objectStoreNames.contains('localExampleIndex')
+    ? ((await db.get('localExampleIndex', key))?.examples ?? [])
+    : []
+  const custom = await getUserExamplesForWord(key)
+
+  if (!custom.length) return pack
+  if (!pack.length) return custom
+
+  const seen = new Set<string>()
+  const merged: LocalExampleItem[] = []
+  for (const item of [...custom, ...pack]) {
+    const sentenceKey = item.sentence.toLowerCase().trim()
+    if (!sentenceKey || seen.has(sentenceKey)) continue
+    seen.add(sentenceKey)
+    merged.push(item)
+  }
+  return merged
+}
+
+/** 仅读取用户/AI 例句表 */
+export async function getUserExamplesForWord(word: string): Promise<LocalExampleItem[]> {
+  const db = await initDatabase()
+  const key = word.toLowerCase().trim()
+  if (!key || !db.objectStoreNames.contains('userExampleIndex')) return []
+  return (await db.get('userExampleIndex', key))?.examples ?? []
+}
+
+/** 写入用户/AI 例句（独立于 Tatoeba 词包，可备份） */
+export async function putLocalExamplesForWord(
+  word: string,
+  examples: LocalExampleItem[],
+): Promise<void> {
+  const db = await initDatabase()
+  if (!db.objectStoreNames.contains('userExampleIndex')) return
+  const key = word.toLowerCase().trim()
+  if (!key) return
+  const entry: LocalExampleIndexEntry = {
+    word: key,
+    examples: examples.map((e) => ({
+      sentence: e.sentence.trim(),
+      translation: (e.translation || '').trim(),
+    })),
+  }
+  await db.put('userExampleIndex', entry)
 }
 
 export async function clearLocalDict(): Promise<void> {
@@ -51,6 +95,7 @@ export async function clearLocalDict(): Promise<void> {
     'localPhraseIndex',
     'localLookalikeIndex',
     'localExampleIndex',
+    'userExampleIndex',
   ] as const
   const existing = storeNames.filter((name) => db.objectStoreNames.contains(name))
   const tx = db.transaction(existing, 'readwrite')
@@ -156,6 +201,12 @@ export async function bulkPutLocalExampleIndex(
   const db = await initDatabase()
 
   if (db.objectStoreNames.contains('localExampleIndex')) {
+    // 重建词包前先保留已有例句（含 AI 生成），避免被清空
+    const previous = await db.getAll('localExampleIndex')
+    const prevByWord = new Map(
+      previous.map((entry) => [entry.word.toLowerCase().trim(), entry.examples || []]),
+    )
+
     const clearTx = db.transaction('localExampleIndex', 'readwrite')
     await Promise.all([clearTx.objectStore('localExampleIndex').clear(), clearTx.done])
 
@@ -167,6 +218,40 @@ export async function bulkPutLocalExampleIndex(
       await Promise.all([...chunk.map((e) => store.put(e)), tx.done])
       onProgress?.(Math.min(i + chunk.length, total), total)
     }
+
+    // 把词包里没有的旧例句（多为 AI 生成）合并回去
+    const mergeTx = db.transaction('localExampleIndex', 'readwrite')
+    const mergeStore = mergeTx.objectStore('localExampleIndex')
+    const touched = new Set<string>()
+
+    for (const entry of entries) {
+      const key = entry.word.toLowerCase().trim()
+      touched.add(key)
+      const oldExamples = prevByWord.get(key)
+      if (!oldExamples?.length) continue
+
+      const packKeys = new Set(
+        (entry.examples || []).map((e) => e.sentence.toLowerCase().trim()),
+      )
+      const extras = oldExamples.filter(
+        (e) => e.sentence?.trim() && !packKeys.has(e.sentence.toLowerCase().trim()),
+      )
+      if (!extras.length) continue
+
+      const merged = [...extras, ...(entry.examples || [])].slice(0, 8)
+      await mergeStore.put({ word: key, examples: merged })
+    }
+
+    // 仅有 AI 例句、词包未覆盖的词也要保留
+    for (const [key, oldExamples] of prevByWord) {
+      if (touched.has(key) || !oldExamples.length) continue
+      await mergeStore.put({
+        word: key,
+        examples: oldExamples.slice(0, 8),
+      })
+    }
+
+    await mergeTx.done
   }
 
   const prev = (await db.get('localDictMeta', META_ID)) || {

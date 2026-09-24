@@ -153,6 +153,13 @@ export async function initDatabase() {
           db.createObjectStore('localExampleIndex', { keyPath: 'word' })
         }
       }
+
+      // Version 17: 用户/AI 自定义例句（备份保留，重建词包不丢）
+      if (oldVersion < 17) {
+        if (!db.objectStoreNames.contains('userExampleIndex')) {
+          db.createObjectStore('userExampleIndex', { keyPath: 'word' })
+        }
+      }
     },
     blocked() {
       console.warn('[DB] 升级被阻塞：请关闭其它标签页后刷新')

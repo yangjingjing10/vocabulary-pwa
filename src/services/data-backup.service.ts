@@ -24,6 +24,7 @@ const MAIN_USER_STORES = [
   'articleDrawings',
   'choiceQuizRecords',
   'choicePracticeStates',
+  'userExampleIndex',
 ] as const
 
 type MainUserStore = (typeof MAIN_USER_STORES)[number]

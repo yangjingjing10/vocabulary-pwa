@@ -166,6 +166,33 @@ export function useQuizState(initialWords: string[], options: UseQuizStateOption
   }
 
   /**
+   * 已会：直接记为正确并前进，不展示反馈
+   */
+  async function markQuestionKnown(): Promise<'advanced' | 'finished' | 'rejected'> {
+    if (isAnswerLocked.value) return 'rejected'
+
+    const index = currentQuestionIndex.value
+    const question = questions.value[index]
+    if (!question) return 'rejected'
+
+    question.userAnswer = '已会'
+    question.gradeResult = {
+      isCorrect: true,
+      correctAnswer: getCorrectAnswer(question),
+    }
+
+    clearFeedback()
+    userAnswer.value = ''
+
+    if (index >= questions.value.length - 1) {
+      return 'finished'
+    }
+
+    currentQuestionIndex.value = index + 1
+    return 'advanced'
+  }
+
+  /**
    * 错题（或跳过）在未达上限时再入队一次，换一种题干形态优先
    */
   async function maybeRequeueWrong(question: QuizQuestion): Promise<void> {
@@ -308,6 +335,7 @@ export function useQuizState(initialWords: string[], options: UseQuizStateOption
     initializeQuiz,
     submitCurrentAnswer,
     skipQuestion,
+    markQuestionKnown,
     acknowledgeFeedback,
     collectGradedResults,
     setResults,

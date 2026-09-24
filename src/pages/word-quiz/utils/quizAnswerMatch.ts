@@ -39,9 +39,18 @@ export function splitCleanSenses(translation: string): string[] {
   return senses
 }
 
-/** 取释义首条可用中文义项（用于对照答案展示） */
+/** 取释义首条可用中文义项（列表摘要等场景） */
 export function extractPrimaryGloss(translation: string): string {
   return splitCleanSenses(translation)[0] || ''
+}
+
+/** 展示用完整释义：全部义项，避免只显示一条造成误导 */
+export function formatFullGloss(translation: string): string {
+  const senses = splitCleanSenses(translation)
+  if (senses.length === 0) {
+    return normalizeDictText(translation).replace(/\n+/g, '；').trim()
+  }
+  return senses.join(' · ')
 }
 
 /**
@@ -76,7 +85,7 @@ export function getQuestionPrompt(
 
 export function getCorrectAnswer(question: Pick<QuizQuestion, 'word' | 'translation' | 'direction'>): string {
   if (question.direction === 'en-to-zh') {
-    return extractPrimaryGloss(question.translation) || question.translation
+    return formatFullGloss(question.translation) || question.translation
   }
   return question.word
 }

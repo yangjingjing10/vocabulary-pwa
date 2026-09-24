@@ -60,7 +60,7 @@ src/pages/home/components/TodayWordCarousel.vue
   — 按选中日期加载单词并自动/手势轮播；点按切换释义，长按打开全屏详情。
 
 src/pages/home/components/WordDetailPage.vue
-  — 全屏单词详情：释义、固定搭配、相近词（默认折叠）、本地例句（默认预览 2 条可展开）；左右滑动切换当日单词。
+  — 全屏单词详情：可折叠英文释义（Free Dictionary）、中文释义、固定搭配、相近词（默认折叠）、本地例句（默认预览 2 条可展开）；左右滑动切换当日单词。
 
 src/pages/home/utils/relatedWords.ts
   — 相近词匹配：形近（编辑距离）、同根、近义；已移除易误伤的同缀规则。
@@ -110,9 +110,6 @@ src/pages/vocabulary-book/components/TranslationRecordsList.vue
 
 src/pages/vocabulary-book/components/TranslationRecordModal.vue
   — 单条翻译记录详情（分数、反馈、用词情况）。
-
-src/pages/vocabulary-book/components/QuizStartConfirmModal.vue
-  — 开始单词测验前的确认弹窗。
 
 src/pages/vocabulary-book/components/DayDeleteConfirmModal.vue
   — 删除整日数据确认弹窗。
@@ -230,10 +227,10 @@ src/pages/word-quiz/components/QuizQuestion.vue
   — 单题作答区：语境题干、输入、即时对错反馈与继续。
 
 src/pages/word-quiz/components/WordCarousel.vue
-  — 测验题干：单词 / 固定搭配 / 例句（高亮生词）。
+  — 测验题干：始终显示当前单词。
 
 src/pages/word-quiz/components/WordContextSentences.vue
-  — 折叠展示目标词在已存文章中的例句。
+  — 精选本地高质量例句；不够时可用 AI 生成可推义例句；展开后若尚未揭示中文释义，可在末尾「再提示」查看全部英文释义。
 
 src/pages/word-quiz/components/QuizResults.vue
   — 测验结果页：正确率、错题/跳过列表与重试/进阶。
@@ -255,7 +252,7 @@ src/pages/word-quiz/composables/useQuizGrading.ts
   — 基于本地词典规则批改对错（不调 AI）。
 
 src/pages/word-quiz/composables/useWordContextSentences.ts
-  — 从文章库检索含目标词屈折的例句。
+  — 精选本地例句；不够时调 AI 生成并落库。
 
 【Types / Utils】
 src/pages/word-quiz/types/quiz.ts
@@ -272,6 +269,9 @@ src/pages/word-quiz/utils/quizPrompt.ts
 
 src/pages/word-quiz/utils/highlightWord.ts
   — 在搭配/例句中高亮目标词屈折形式。
+
+src/pages/word-quiz/utils/selectQualityExamples.ts
+  — 本地例句教学质量打分与精选。
 
 src/pages/word-quiz/utils/selectPracticeWords.ts
   — 选择题抽词：优先错题、不重复已练、可补满批次。
@@ -504,6 +504,9 @@ src/services/rss.service.ts
 src/services/dictionary-api.service.ts
   — 查词：本地 ECDICT → 远程词典 API → 用户 LLM 补释义；导入时本地短语优先，缺失则 LLM 补固定搭配。
 
+src/services/english-definition.service.ts
+  — 英文释义：Free Dictionary（外网，国内常超时）优先；失败则回退用户 LLM。长期可改为 ECDICT 离线英文 definition。
+
 src/services/local-dictionary.service.ts
   — 首次从静态包导入离线词库、短语、形近与 Tatoeba 例句，并提供本地查词/短语/例句。
 
@@ -512,6 +515,9 @@ src/services/paragraph-revision.service.ts
 
 src/services/speech.service.ts
   — Web Speech 音色列表、语速偏好与朗读/停止。
+
+src/services/example-generation.service.ts
+  — 测验中按需调用 LLM 生成可推义例句并写入本地索引。
 
 src/services/wallpaper.service.ts
   — 应用 CSS 壁纸变量、轮播定时与变更订阅。

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { AnswerFeedback, QuizQuestion } from '../types/quiz'
 import WordCarousel from './WordCarousel.vue'
+import WordContextSentences from './WordContextSentences.vue'
 
 interface Props {
   question: QuizQuestion
@@ -19,6 +20,7 @@ interface Emits {
   (e: 'update:modelValue', value: string): void
   (e: 'next'): void
   (e: 'skip'): void
+  (e: 'known'): void
   (e: 'acknowledge'): void
 }
 
@@ -41,7 +43,7 @@ const carouselWords = computed(() =>
 const placeholder = computed(() =>
   props.isAnswerLocked
     ? '回车继续下一题'
-    : '输入中文释义回车确认，空回车跳过',
+    : '输入中文释义回车确认，空回车表示不会',
 )
 
 const feedbackText = computed(() => {
@@ -72,35 +74,54 @@ function handleKeyDown(event: KeyboardEvent) {
 
 <template>
   <div class="quiz-question-container">
-    <div class="quiz-progress-chip">
-      {{ progress }}
-    </div>
-
-    <WordCarousel
-      :words="carouselWords"
-      :current-index="currentIndex"
-    />
-
-    <div
-      v-if="isAnswerLocked"
-      class="quiz-feedback"
-      :class="answerFeedback === 'correct' ? 'is-correct' : 'is-wrong'"
-      role="status"
-    >
-      <div class="quiz-feedback__title">{{ feedbackText }}</div>
-      <div class="quiz-feedback__answer">
-        {{ feedbackCorrectAnswer }}
+    <div class="quiz-question-body">
+      <div class="quiz-progress-chip">
+        {{ progress }}
       </div>
-      <button
-        type="button"
-        class="quiz-feedback__continue"
-        @click="emit('acknowledge')"
+
+      <WordCarousel
+        :words="carouselWords"
+        :current-index="currentIndex"
+      />
+
+      <div class="quiz-example-slot">
+        <WordContextSentences
+          :word="question.word"
+          :gloss="question.translation"
+          :definition-revealed="isAnswerLocked"
+        />
+      </div>
+
+      <div
+        v-if="isAnswerLocked"
+        class="quiz-feedback"
+        :class="answerFeedback === 'correct' ? 'is-correct' : 'is-wrong'"
+        role="status"
       >
-        继续
-      </button>
+        <div class="quiz-feedback__title">{{ feedbackText }}</div>
+        <div class="quiz-feedback__answer">
+          {{ feedbackCorrectAnswer }}
+        </div>
+        <button
+          type="button"
+          class="quiz-feedback__continue"
+          @click="emit('acknowledge')"
+        >
+          继续
+        </button>
+      </div>
     </div>
 
     <div class="quiz-input-panel">
+      <button
+        v-if="!isAnswerLocked"
+        type="button"
+        class="quiz-known-btn"
+        @click="emit('known')"
+      >
+        已会，跳过
+      </button>
+
       <div class="quiz-input-wrapper">
         <input
           :key="currentIndex"

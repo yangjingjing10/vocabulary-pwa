@@ -9,6 +9,12 @@ import {
   lookupLocalLookalikes,
   lookupLocalPhrases,
 } from '@/services/local-dictionary.service'
+import {
+  fetchEnglishDefinitions,
+  englishDefinitionSourceLabel,
+  type EnglishSense,
+  type EnglishDefinitionResult,
+} from '@/services/english-definition.service'
 import { speakText } from '@/services/speech.service'
 import {
   findRelatedInList,
@@ -52,6 +58,12 @@ const isLoadingRelated = ref(false)
 const resolvedExamples = ref<LocalExampleItem[]>([])
 const isLoadingExamples = ref(false)
 const examplesExpanded = ref(false)
+const englishSenses = ref<EnglishSense[]>([])
+const englishSource = ref<EnglishDefinitionResult['source'] | undefined>()
+const isLoadingEnglish = ref(false)
+const englishExpanded = ref(false)
+
+const englishSourceText = computed(() => englishDefinitionSourceLabel(englishSource.value))
 
 let dragStartX = 0
 let isDragging = false
@@ -174,6 +186,27 @@ async function resolveExamplesForCurrent() {
   }
 }
 
+async function resolveEnglishForCurrent() {
+  const item = current.value
+  if (!item?.word) {
+    englishSenses.value = []
+    englishSource.value = undefined
+    return
+  }
+
+  isLoadingEnglish.value = true
+  try {
+    const result = await fetchEnglishDefinitions(item.word)
+    englishSenses.value = result?.senses ?? []
+    englishSource.value = result?.source
+  } catch {
+    englishSenses.value = []
+    englishSource.value = undefined
+  } finally {
+    isLoadingEnglish.value = false
+  }
+}
+
 async function goTo(dir: 'next' | 'prev') {
   if (isAnimating.value || total.value <= 1) return
   isAnimating.value = true
@@ -220,6 +253,10 @@ function toggleRelated() {
 
 function toggleExamples() {
   examplesExpanded.value = !examplesExpanded.value
+}
+
+function toggleEnglish() {
+  englishExpanded.value = !englishExpanded.value
 }
 
 function onRelatedClick(hit: RelatedWordHit) {
@@ -286,9 +323,11 @@ watch(
     phrasesExpanded.value = false
     relatedExpanded.value = false
     examplesExpanded.value = false
+    englishExpanded.value = false
     void resolvePhrasesForCurrent()
     void resolveRelatedFromDict()
     void resolveExamplesForCurrent()
+    void resolveEnglishForCurrent()
   },
   { immediate: true },
 )
@@ -346,7 +385,56 @@ onUnmounted(() => {
             </div>
 
             <section class="word-detail__section">
-              <h2 class="word-detail__section-title">释义</h2>
+              <button
+                class="word-detail__section-toggle"
+                type="button"
+                :aria-expanded="englishExpanded"
+                @click.stop="toggleEnglish"
+              >
+                <span class="word-detail__section-title">英文释义</span>
+                <span class="word-detail__section-meta">
+                  <template v-if="isLoadingEnglish">加载中…</template>
+                  <template v-else-if="englishSenses.length">
+                    {{ englishSenses.reduce((n, s) => n + s.definitions.length, 0) }} 条
+                  </template>
+                  <template v-else>暂无</template>
+                  <ChevronDown
+                    class="word-detail__fold-icon"
+                    :class="{ 'is-open': englishExpanded }"
+                    :size="14"
+                  />
+                </span>
+              </button>
+
+              <div v-if="englishExpanded" class="word-detail__en-body">
+                <p v-if="isLoadingEnglish" class="word-detail__empty">加载英文释义…</p>
+                <template v-else-if="englishSenses.length">
+                  <div
+                    v-for="(sense, si) in englishSenses"
+                    :key="`${si}-${sense.partOfSpeech}`"
+                    class="word-detail__en-sense"
+                  >
+                    <span class="word-detail__en-pos">{{ sense.partOfSpeech }}</span>
+                    <ol class="word-detail__en-list">
+                      <li
+                        v-for="(def, di) in sense.definitions"
+                        :key="di"
+                        class="word-detail__en-item"
+                      >
+                        {{ def }}
+                      </li>
+                    </ol>
+                  </div>
+                  <p class="word-detail__attr">{{ englishSourceText }}</p>
+                </template>
+                <p v-else class="word-detail__empty">
+                  暂无英文释义（外网词典不可达时需已配置 AI，或开启网络代理）
+                </p>
+              </div>
+            </section>
+
+            <section class="word-detail__section">
+              <h2 class="word-detail__section-title">中文释义</h2>
               <p v-if="meaningText" class="word-detail__meaning">{{ meaningText }}</p>
               <p v-else class="word-detail__empty">暂无释义</p>
             </section>
@@ -719,8 +807,48 @@ onUnmounted(() => {
   color: var(--app-font-color-soft, #94a3b8);
 }
 
-.word-detail__related-body {
+.word-detail__related-body,
+.word-detail__en-body {
   width: 100%;
+}
+
+.word-detail__en-sense {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.word-detail__en-sense:last-of-type {
+  margin-bottom: 0;
+}
+
+.word-detail__en-pos {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.2);
+  color: var(--app-font-color-muted, #475569);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: lowercase;
+}
+
+.word-detail__en-list {
+  margin: 0;
+  padding: 0 0 0 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.word-detail__en-item {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--app-font-color, #0f172a);
 }
 
 .word-detail__related-list {

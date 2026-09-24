@@ -159,7 +159,7 @@ onBeforeUnmount(() => {
           v-else-if="day.articleCount === 0 && day.choiceQuizRecords.length === 0"
           class="vocab-day__no-records"
         >
-          No records yet. Click "Start Quiz" to generate an article
+          暂无记录，可开始测试或生成文章
         </div>
 
         <VocabWordItem

@@ -93,16 +93,24 @@ function tokenize(sentence) {
 function scoreExample(sentence, hasTranslation, exactForm) {
   let score = 0
   if (hasTranslation) score += 100
+  else score -= 30
   if (exactForm) score += 20
   const len = sentence.length
-  // 学习向：中等长度更好
-  if (len >= 25 && len <= 90) score += 15
-  else if (len < 25) score += 5
+  // 学习向：偏「可推义」的中等偏长句
+  if (len >= 35 && len <= 100) score += 25
+  else if (len >= 25 && len <= 120) score += 12
+  else if (len < 20) score -= 15
   const words = tokenize(sentence).length
-  if (words >= 4 && words <= 14) score += 10
-  // 轻微偏好不含专名过多的句子（全大写词少）
+  if (words >= 6 && words <= 16) score += 18
+  else if (words >= 4 && words <= 20) score += 8
+  // 轻微过短人称开头口语（信息不足）
+  if (/^(I|You|He|She|We|They|It)\b/.test(sentence) && words <= 7) score -= 15
+  // 轻微问句
+  if (/\?\s*$/.test(sentence)) score -= 6
+  // 轻微专名过多
   const caps = (sentence.match(/\b[A-Z][a-z]+\b/g) || []).length
-  if (caps <= 2) score += 3
+  if (caps <= 1) score += 4
+  else if (caps >= 4) score -= 12
   return score
 }
 

@@ -68,6 +68,7 @@ const {
   setStatus,
   isQuestionSettled,
   buildQuestion,
+  markQuestionKnown,
 } = useQuizState(props.words, { reviewMode: props.reviewMode })
 
 const pauseNamespace = computed(() =>
@@ -328,6 +329,22 @@ function handleSkip() {
   skipQuestion()
 }
 
+async function handleKnown() {
+  const indexBefore = currentQuestionIndex.value
+  const question = questions.value[indexBefore]
+  const outcome = await markQuestionKnown()
+
+  if (outcome === 'rejected') return
+
+  if (question?.gradeResult && isQuestionSettled(question)) {
+    persistQuestionByRef(question, false)
+  }
+
+  if (outcome === 'finished') {
+    await finishWithLocalResults()
+  }
+}
+
 async function handleAcknowledge() {
   const indexBefore = currentQuestionIndex.value
   const question = questions.value[indexBefore]
@@ -563,6 +580,7 @@ const resultsTitle = computed(() =>
         :feedback-correct-answer="feedbackCorrectAnswer"
         @next="handleNext"
         @skip="handleSkip"
+        @known="handleKnown"
         @acknowledge="handleAcknowledge"
       />
 

@@ -1,59 +1,45 @@
 import { ref } from 'vue'
-import { getAllArticles } from '@/db/repositories/articles.repository'
-import { expandWordForms, highlightWordInText } from '../utils/highlightWord'
+import type { LocalExampleItem } from '@/db/schema/database'
+import {
+  ensureLocalDictionary,
+  lookupLocalExamples,
+} from '@/services/local-dictionary.service'
+import { generateQualityExamplesForWord } from '@/services/example-generation.service'
+import { highlightWordInText } from '../utils/highlightWord'
+import {
+  hasEnoughQualityExamples,
+  selectQualityExamples,
+} from '../utils/selectQualityExamples'
 
 export interface WordContextSentence {
-  articleId: string
-  articleTitle: string
   sentence: string
   translation?: string
 }
 
-/**
- * 从 HTML 内容中提取纯文本句子
- */
-function extractSentencesFromHtml(htmlContent: string): string[] {
-  const tempDiv = document.createElement('div')
-  tempDiv.innerHTML = htmlContent
-
-  const textContent = (tempDiv.textContent || tempDiv.innerText || '')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  if (!textContent) return []
-
-  return textContent
-    .split(/(?<=[.!?。！？])\s+/)
-    .map((s) => s.trim())
-    .filter((s) => {
-      if (s.length < 8) return false
-      const wordCount = (s.match(/[A-Za-z]+/g) || []).length
-      return wordCount >= 4
-    })
+function toDisplaySentences(
+  word: string,
+  examples: LocalExampleItem[],
+): WordContextSentence[] {
+  return examples.map((item) => ({
+    sentence: highlightWordInText(item.sentence, word),
+    translation: item.translation || undefined,
+  }))
 }
 
 /**
- * 检查句子中是否包含目标单词（仅整词 + 常见屈折，禁止模糊前缀）
- */
-function sentenceContainsWord(sentence: string, targetWord: string): boolean {
-  const forms = new Set(expandWordForms(targetWord))
-  if (forms.size === 0) return false
-
-  const tokens = sentence.toLowerCase().match(/[a-z0-9']+/g) || []
-  return tokens.some((token) => forms.has(token))
-}
-
-/**
- * 从所有文章中查找包含指定单词的句子
+ * 精选本地例句；不够时可由 AI 生成并落库
  */
 export function useWordContextSentences() {
   const sentences = ref<WordContextSentence[]>([])
   const isLoading = ref(false)
+  const isGenerating = ref(false)
+  const needsAiExamples = ref(false)
   const error = ref<string | null>(null)
 
   async function findSentencesByWord(word: string): Promise<void> {
     if (!word || !word.trim()) {
       sentences.value = []
+      needsAiExamples.value = false
       return
     }
 
@@ -61,46 +47,48 @@ export function useWordContextSentences() {
     error.value = null
 
     try {
-      const articles = await getAllArticles()
-      const foundSentences: WordContextSentence[] = []
-      const seen = new Set<string>()
-
-      for (const article of articles) {
-        const articleSentences = extractSentencesFromHtml(article.content)
-
-        for (const sentence of articleSentences) {
-          if (!sentenceContainsWord(sentence, word)) continue
-
-          const highlightedSentence = highlightWordInText(sentence, word)
-          if (!highlightedSentence.includes('<mark>')) continue
-
-          const dedupeKey = `${article.id}::${sentence.toLowerCase()}`
-          if (seen.has(dedupeKey)) continue
-          seen.add(dedupeKey)
-
-          foundSentences.push({
-            articleId: article.id,
-            articleTitle: article.title,
-            sentence: highlightedSentence,
-            translation: undefined,
-          })
-        }
-      }
-
-      sentences.value = foundSentences
+      await ensureLocalDictionary()
+      const raw = await lookupLocalExamples(word)
+      const curated = selectQualityExamples(word, raw)
+      sentences.value = toDisplaySentences(word, curated)
+      needsAiExamples.value = !hasEnoughQualityExamples(curated)
     } catch (err) {
       console.error('Failed to find sentences:', err)
-      error.value = err instanceof Error ? err.message : '查找句子失败'
+      error.value = err instanceof Error ? err.message : '查找例句失败'
       sentences.value = []
+      needsAiExamples.value = true
     } finally {
       isLoading.value = false
+    }
+  }
+
+  async function generateWithAi(word: string, gloss?: string): Promise<void> {
+    if (!word.trim() || isGenerating.value) return
+
+    isGenerating.value = true
+    error.value = null
+
+    try {
+      const generated = await generateQualityExamplesForWord(word, gloss)
+      const curated = selectQualityExamples(word, generated)
+      const display = curated.length > 0 ? curated : generated.slice(0, 3)
+      sentences.value = toDisplaySentences(word, display)
+      needsAiExamples.value = !hasEnoughQualityExamples(display)
+    } catch (err) {
+      console.error('Failed to generate examples:', err)
+      error.value = err instanceof Error ? err.message : 'AI 生成例句失败'
+    } finally {
+      isGenerating.value = false
     }
   }
 
   return {
     sentences,
     isLoading,
+    isGenerating,
+    needsAiExamples,
     error,
     findSentencesByWord,
+    generateWithAi,
   }
 }

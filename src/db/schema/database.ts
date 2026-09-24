@@ -327,6 +327,11 @@ export interface VocabularyDatabase extends DBSchema {
     key: string
     value: LocalExampleIndexEntry
   }
+  /** 用户或 AI 生成的例句（随备份导出，重建 Tatoeba 词包时不丢） */
+  userExampleIndex: {
+    key: string
+    value: LocalExampleIndexEntry
+  }
   choiceQuizRecords: {
     key: string
     value: ChoiceQuizRecord

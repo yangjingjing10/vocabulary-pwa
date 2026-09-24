@@ -11,7 +11,6 @@ import VocabEmptyState from './components/VocabEmptyState.vue'
 import VocabDayCard from './components/VocabDayCard.vue'
 import VocabCalendarModal from './components/VocabCalendarModal.vue'
 import TranslationRecordModal from './components/TranslationRecordModal.vue'
-import QuizStartConfirmModal from './components/QuizStartConfirmModal.vue'
 import DayDeleteConfirmModal from './components/DayDeleteConfirmModal.vue'
 import ChoiceQuizRecordsPage from './components/ChoiceQuizRecordsPage.vue'
 
@@ -48,9 +47,6 @@ const showCalendarModal = ref(false)
 const selectedTranslationRecord = ref<any>(null)
 const showChoiceRecordsPage = ref(false)
 const choiceRecordsDate = ref('')
-const showQuizStartConfirm = ref(false)
-const pendingQuizWords = ref<string[]>([])
-const pendingQuizDate = ref('')
 const showDayDeleteConfirm = ref(false)
 const pendingDeleteDay = ref<DayData | null>(null)
 const isDeletingDay = ref(false)
@@ -90,37 +86,9 @@ async function loadCurrentWeek() {
   await vocabData.loadWeekData(weekStart)
 }
 
-async function handleStartQuiz(day: any) {
+function handleStartQuiz(day: any) {
   const wordsToQuiz = day.words.map((w: any) => w.word)
-
-  if (day.articleCount > 0) {
-    emit('startQuiz', wordsToQuiz, day.date)
-    return
-  }
-
-  pendingQuizWords.value = wordsToQuiz
-  pendingQuizDate.value = day.date
-  showQuizStartConfirm.value = true
-}
-
-function closeQuizStartConfirm() {
-  showQuizStartConfirm.value = false
-  pendingQuizWords.value = []
-  pendingQuizDate.value = ''
-}
-
-function confirmGenerateArticleThenQuiz() {
-  const words = [...pendingQuizWords.value]
-  const date = pendingQuizDate.value
-  closeQuizStartConfirm()
-  emit('generateArticle', words, date)
-}
-
-function confirmStartQuizDirectly() {
-  const words = [...pendingQuizWords.value]
-  const date = pendingQuizDate.value
-  closeQuizStartConfirm()
-  emit('startQuiz', words, date)
+  emit('startQuiz', wordsToQuiz, day.date)
 }
 
 async function handleOpenArticle(date: string) {
@@ -305,13 +273,6 @@ async function confirmDeleteDay() {
       <TranslationRecordModal
         :record="selectedTranslationRecord"
         @close="closeTranslationModal"
-      />
-
-      <QuizStartConfirmModal
-        :show="showQuizStartConfirm"
-        @close="closeQuizStartConfirm"
-        @generate-article="confirmGenerateArticleThenQuiz"
-        @start-quiz="confirmStartQuizDirectly"
       />
 
       <DayDeleteConfirmModal

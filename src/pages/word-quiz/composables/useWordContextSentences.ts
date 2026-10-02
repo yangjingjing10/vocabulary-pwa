@@ -83,16 +83,20 @@ export function useWordContextSentences() {
     }
   }
 
-  async function generateWithAi(word: string, gloss?: string): Promise<void> {
+  async function generateWithAi(
+    word: string,
+    gloss?: string,
+    opts: { force?: boolean } = {},
+  ): Promise<void> {
     if (!word.trim() || isGenerating.value) return
 
     isGenerating.value = true
     error.value = null
 
     try {
-      const generated = await generateQualityExamplesForWord(word, gloss)
+      const generated = await generateQualityExamplesForWord(word, gloss, opts)
       sentences.value = toDisplaySentences(word, pickDisplayExamples(word, generated))
-      // 已成功落库，下次同一词直接读库，不再显示生成按钮
+      // 已成功落库；缺例句时隐藏「需生成」，仍保留「可再生成」入口
       needsAiExamples.value = false
     } catch (err) {
       console.error('Failed to generate examples:', err)

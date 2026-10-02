@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted } from 'vue'
-import { ChevronDown, Loader2, Sparkles } from 'lucide-vue-next'
+import { ChevronDown, Loader2, RefreshCw, Sparkles } from 'lucide-vue-next'
 import { useWordContextSentences } from '../composables/useWordContextSentences'
 import {
   fetchEnglishDefinitions,
@@ -51,8 +51,13 @@ const canToggle = computed(
   () => !isLoading.value && !isGenerating.value && sentences.value.length > 0,
 )
 
+/** 缺例句：首次生成；已有例句：允许强制再生成（覆盖低质句） */
 const showAiStar = computed(
-  () => needsAiExamples.value && !isLoading.value,
+  () => !isLoading.value && (needsAiExamples.value || sentences.value.length > 0),
+)
+
+const isRegenMode = computed(
+  () => !needsAiExamples.value && sentences.value.length > 0,
 )
 
 /** 已展开例句、尚未揭示中文时，显示「再提示」入口 */
@@ -109,7 +114,7 @@ function toggleCollapse() {
 
 async function handleGenerate(event: Event) {
   event.stopPropagation()
-  await generateWithAi(props.word, props.gloss)
+  await generateWithAi(props.word, props.gloss, { force: isRegenMode.value })
   if (sentences.value.length > 0) {
     isCollapsed.value = false
   }
@@ -165,12 +170,26 @@ async function revealEnglishHint() {
         v-if="showAiStar"
         type="button"
         class="example-panel__star"
+        :class="{ 'is-regen': isRegenMode }"
         :disabled="isGenerating"
-        :aria-label="isGenerating ? '正在生成例句' : 'AI 生成例句'"
-        :title="isGenerating ? '生成中…' : 'AI 生成高质量例句'"
+        :aria-label="
+          isGenerating
+            ? '正在生成例句'
+            : isRegenMode
+              ? '重新生成例句'
+              : 'AI 生成例句'
+        "
+        :title="
+          isGenerating
+            ? '生成中…'
+            : isRegenMode
+              ? '例句不好用？点此重新生成（会覆盖旧例句）'
+              : 'AI 生成高质量例句'
+        "
         @click="handleGenerate"
       >
         <Loader2 v-if="isGenerating" :size="15" class="is-spinning" />
+        <RefreshCw v-else-if="isRegenMode" :size="15" />
         <Sparkles v-else :size="15" />
       </button>
     </div>

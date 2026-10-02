@@ -141,21 +141,31 @@ async function requestExamples(
   }
 }
 
+export interface GenerateExamplesOptions {
+  /** 强制重新生成并覆盖用户例句库（用于质量差时重写） */
+  force?: boolean
+}
+
 /**
  * 用用户配置的 LLM 为目标词生成高质量可推义例句，并写入用户例句库（可备份、重建词包不丢）
  */
 export async function generateQualityExamplesForWord(
   word: string,
   gloss?: string,
+  opts: GenerateExamplesOptions = {},
 ): Promise<LocalExampleItem[]> {
   const key = word.trim().toLowerCase()
   if (!key) throw new Error('单词为空')
 
-  // 已有足够用户/AI 例句则直接复用，避免重复消耗 token
+  const force = Boolean(opts.force)
   const previousUser = await getUserExamplesForWord(key)
-  const previousWithTranslation = previousUser.filter((e) => e.translation?.trim())
-  if (previousWithTranslation.length >= 2) {
-    return previousWithTranslation.slice(0, 3)
+
+  // 非强制且已有足够用户/AI 例句则直接复用，避免重复消耗 token
+  if (!force) {
+    const previousWithTranslation = previousUser.filter((e) => e.translation?.trim())
+    if (previousWithTranslation.length >= 2) {
+      return previousWithTranslation.slice(0, 3)
+    }
   }
 
   const apiConfig = await getApiConfig()
@@ -203,7 +213,8 @@ export async function generateQualityExamplesForWord(
 
   if (generated.length === 0) throw new Error('AI 未返回可用例句')
 
-  const merged = mergeExamples(previousUser, generated)
+  // 强制重生成：用新例句覆盖，避免旧低质句继续占位
+  const merged = force ? generated.slice(0, 8) : mergeExamples(previousUser, generated)
   await putLocalExamplesForWord(key, merged)
 
   return generated

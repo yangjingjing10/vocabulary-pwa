@@ -517,7 +517,7 @@ src/services/speech.service.ts
   — Web Speech 音色列表、语速偏好与朗读/停止。
 
 src/services/example-generation.service.ts
-  — 测验中按需调用 LLM 生成可推义例句并写入本地索引。
+  — 测验中按需调用 LLM 生成可推义例句并写入本地索引（提示词要求健康文明、多义词取干净义）。
 
 src/services/example-prefetch.service.ts
   — 后台静默为缺例句单词预生成（启动/导入后排队，今日词优先；不弹 toast；ring buffer 日志供控制台）。

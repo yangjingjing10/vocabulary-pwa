@@ -14,7 +14,7 @@ function isOllamaEndpoint(baseUrl: string): boolean {
   return /:11434\b/i.test(baseUrl) || /ollama/i.test(baseUrl)
 }
 
-const SYSTEM_PROMPT = `你是英语教学例句作者，专门写「能帮助学习者从语境推出词义」的例句。
+const SYSTEM_PROMPT = `你是英语教学例句作者，专门写「能帮助学习者从语境推出词义」的例句。面向中学生/自学者，内容必须健康、文明、适合课堂。
 
 硬性要求：
 1. 为目标词生成恰好 3 条英文例句，每条附一句简洁中文翻译。
@@ -24,20 +24,26 @@ const SYSTEM_PROMPT = `你是英语教学例句作者，专门写「能帮助学
 5. 句子自然、难度适中（CEFR B1–B2），长度约 10–20 个单词；不要百科定义堆砌，不要生造怪句。
 6. 三条例句覆盖略有不同的情境或搭配，但词义一致、不偏僻义。
 7. 中文翻译准确对应英文，不要解释词义本身。
-8. 只返回 JSON，不要 markdown，不要其他说明。格式：
+8. 内容安全（最高优先级，违反则整组无效）：
+   - 只写健康、得体、无色情暗示的例句；禁止任何性、色情、黄段子、身体亲密或低俗双关。
+   - 禁止血腥暴力、歧视仇恨、毒品赌博、脏话辱骂。
+   - 多义词必须选「日常/课堂最常见且干净」的义项：如 suck →「吸（吸尘器等）」或口语「很差/糟糕」，绝不用性相关义；dick/ass 等也只写中性日常义或礼貌口语义。
+   - 场景优先：学习、工作、天气、旅行、运动、科技、日常家务等。
+9. 只返回 JSON，不要 markdown，不要其他说明。格式：
 {"examples":[{"sentence":"...","translation":"..."},{"sentence":"...","translation":"..."},{"sentence":"...","translation":"..."}]}`
 
 /** 小模型更容易遵守的短指令（JSON 解析失败后重试用） */
 const SIMPLE_JSON_RETRY_PROMPT = `只输出一个 JSON 对象，不要 markdown，不要解释。
 格式必须是：
 {"examples":[{"sentence":"英文句1","translation":"中文1"},{"sentence":"英文句2","translation":"中文2"},{"sentence":"英文句3","translation":"中文3"}]}
-为下面单词写 3 条能让人猜出词义的英文例句（B1，每句约 10-18 词）。`
+为下面单词写 3 条能让人猜出词义的英文例句（B1，每句约 10-18 词）。
+必须健康文明、适合课堂；禁止色情/暴力/脏话。多义词只用干净日常义（如 suck=吸走灰尘或「很差」）。`
 
 function buildUserPrompt(word: string, gloss?: string): string {
   const glossLine = gloss?.trim()
     ? `参考中文释义（仅供你把握词义，不要照抄进例句）：${gloss.trim()}`
-    : '未提供参考释义，请按该词最常用义出题。'
-  return `目标单词：${word.trim()}\n${glossLine}`
+    : '未提供参考释义，请按该词最常用且健康文明的义项出题。'
+  return `目标单词：${word.trim()}\n${glossLine}\n内容要求：健康文明、无色情暗示；若有低俗义项请改用日常干净义项。`
 }
 
 /** 尽量把模型乱七八糟的输出修成可 parse 的 JSON 字符串 */

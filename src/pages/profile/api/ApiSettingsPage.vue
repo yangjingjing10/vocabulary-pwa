@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { ArrowLeft, ArrowDown, ArrowUp, Book, Check, Eye, EyeOff, KeyRound, LoaderCircle, Plus, Save, Trash2, Volume2, Zap } from 'lucide-vue-next'
+import { ArrowLeft, ArrowDown, ArrowUp, Book, Check, Eye, EyeOff, KeyRound, LoaderCircle, Play, Plus, Save, Square, Trash2, Volume2, Zap } from 'lucide-vue-next'
 
 import { getApiConfig, saveApiConfig } from '@/db/repositories/api-config.repository'
 import { deleteDictionaryApiConfig, getAllDictionaryApiConfigs, saveDictionaryApiConfig } from '@/db/repositories/dictionary-api-config.repository'
 import type { DictionaryApiConfig } from '@/db/schema/database'
 import { queryWordDefinition } from '@/services/dictionary-api.service'
+import {
+  examplePrefetchService,
+  type ExamplePrefetchLog,
+  type ExamplePrefetchStatus,
+} from '@/services/example-prefetch.service'
 import {
   getSpeechRate,
   getSelectedVoiceURI,
@@ -102,6 +107,24 @@ const speechVoices = computed(() => speechSettings.availableVoices.value)
 const speechSupported = ref(typeof window !== 'undefined' && 'speechSynthesis' in window)
 const previewWord = ref('vocabulary')
 
+const prefetchStatus = ref<ExamplePrefetchStatus>('idle')
+const prefetchDone = ref(0)
+const prefetchTotal = ref(0)
+const prefetchCurrentWord = ref('')
+const prefetchLogs = ref<ExamplePrefetchLog[]>([])
+let unsubscribePrefetch: (() => void) | null = null
+
+const prefetchStatusLabel = computed(() => {
+  if (prefetchStatus.value === 'running') return '生成中'
+  if (prefetchStatus.value === 'paused') return '已暂停'
+  return '空闲'
+})
+const prefetchProgressText = computed(() => {
+  if (prefetchTotal.value <= 0) return `${prefetchDone.value} / —`
+  return `${prefetchDone.value} / ${prefetchTotal.value}`
+})
+const prefetchIsRunning = computed(() => prefetchStatus.value === 'running')
+
 const effectiveTextModel = computed(() => config.value.textModel === 'custom' ? customTextModel.value : config.value.textModel)
 const isOllama = computed(() => selectedProvider.value === 'ollama' || /:11434\b/i.test(config.value.baseUrl))
 const effectiveApiKey = computed(() => {
@@ -109,6 +132,26 @@ const effectiveApiKey = computed(() => {
   if (key) return key
   return isOllama.value ? 'ollama' : ''
 })
+
+function syncPrefetchLogs() {
+  prefetchLogs.value = examplePrefetchService.getLogs()
+}
+
+function formatPrefetchTime(at: number) {
+  const d = new Date(at)
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  const ss = String(d.getSeconds()).padStart(2, '0')
+  return `${hh}:${mm}:${ss}`
+}
+
+function startPrefetch() {
+  examplePrefetchService.kick({ delayMs: 0 })
+}
+
+function stopPrefetch() {
+  examplePrefetchService.stop()
+}
 
 function detectProviderFromUrl(baseUrl: string): string {
   const url = baseUrl.trim().toLowerCase()
@@ -121,6 +164,20 @@ function detectProviderFromUrl(baseUrl: string): string {
 }
 
 onMounted(async () => {
+  const snap = examplePrefetchService.snapshot
+  prefetchStatus.value = snap.status
+  prefetchDone.value = snap.done
+  prefetchTotal.value = snap.total
+  prefetchCurrentWord.value = snap.currentWord
+  syncPrefetchLogs()
+  unsubscribePrefetch = examplePrefetchService.subscribe((event) => {
+    prefetchStatus.value = event.status
+    prefetchDone.value = event.done
+    prefetchTotal.value = event.total
+    prefetchCurrentWord.value = event.currentWord ?? ''
+    syncPrefetchLogs()
+  })
+
   const savedConfig = await getApiConfig()
   if (savedConfig) {
     config.value = {
@@ -146,6 +203,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  unsubscribePrefetch?.()
+  unsubscribePrefetch = null
   stopSpeaking()
 })
 
@@ -550,6 +609,73 @@ async function testDictionaryApi(config: DictionaryApiConfig) {
         </div>
       </section>
 
+      <section class="api-card api-prefetch-console">
+        <div class="api-card__heading">
+          <div class="api-card__heading-mark"><Zap :size="16" /></div>
+          <div>
+            <h2>AI 后台控制台</h2>
+            <p>查看例句静默预生成进度（不干扰测验页手动生成）</p>
+          </div>
+          <span
+            class="api-prefetch-status"
+            :class="{ 'is-running': prefetchIsRunning }"
+          >
+            {{ prefetchStatusLabel }}
+          </span>
+        </div>
+
+        <div class="api-prefetch-stats">
+          <div class="api-prefetch-stat">
+            <span>进度</span>
+            <strong>{{ prefetchProgressText }}</strong>
+          </div>
+          <div class="api-prefetch-stat">
+            <span>当前单词</span>
+            <strong class="api-prefetch-word">{{ prefetchCurrentWord || '—' }}</strong>
+          </div>
+        </div>
+
+        <div class="api-prefetch-actions">
+          <button
+            class="api-fetch-button"
+            type="button"
+            :disabled="prefetchIsRunning"
+            @click="startPrefetch"
+          >
+            <Play :size="13" />
+            <span>开始补生成</span>
+          </button>
+          <button
+            class="api-fetch-button api-prefetch-stop"
+            type="button"
+            :disabled="!prefetchIsRunning"
+            @click="stopPrefetch"
+          >
+            <Square :size="13" />
+            <span>停止</span>
+          </button>
+        </div>
+
+        <div class="api-prefetch-logs">
+          <span class="api-section__label">最近日志</span>
+          <ul v-if="prefetchLogs.length" class="api-prefetch-log-list">
+            <li
+              v-for="log in prefetchLogs"
+              :key="log.id"
+              class="api-prefetch-log"
+              :class="`is-${log.level}`"
+            >
+              <time>{{ formatPrefetchTime(log.at) }}</time>
+              <span v-if="log.word" class="api-prefetch-log__word">{{ log.word }}</span>
+              <span class="api-prefetch-log__msg">{{ log.message }}</span>
+            </li>
+          </ul>
+          <p v-else class="api-feedback" style="opacity: 0.75; margin: 0">
+            <span>暂无日志；App 启动或导入单词后会在此显示</span>
+          </p>
+        </div>
+      </section>
+
       <section class="api-card">
         <div class="api-card__heading">
           <div class="api-card__heading-mark"><Volume2 :size="16" /></div>
@@ -609,6 +735,74 @@ async function testDictionaryApi(config: DictionaryApiConfig) {
         <p v-else class="api-feedback">
           <span>当前浏览器不支持语音合成</span>
         </p>
+      </section>
+
+      <section class="api-card api-prefetch-console">
+        <div class="api-card__heading">
+          <div class="api-card__heading-mark"><Zap :size="16" /></div>
+          <div>
+            <h2>AI 后台控制台</h2>
+            <p>查看例句静默预生成进度（不弹 toast）</p>
+          </div>
+          <span
+            class="api-prefetch-status-badge"
+            :class="{ 'is-running': prefetchIsRunning }"
+          >{{ prefetchStatusLabel }}</span>
+        </div>
+
+        <div class="api-prefetch-stats">
+          <div class="api-prefetch-stat">
+            <span class="api-prefetch-stat__label">进度</span>
+            <strong class="api-prefetch-stat__value">{{ prefetchProgressText }}</strong>
+          </div>
+          <div class="api-prefetch-stat">
+            <span class="api-prefetch-stat__label">当前单词</span>
+            <strong class="api-prefetch-stat__value api-prefetch-stat__value--word">
+              {{ prefetchCurrentWord || '—' }}
+            </strong>
+          </div>
+        </div>
+
+        <div class="api-prefetch-actions">
+          <button
+            class="api-prefetch-btn"
+            type="button"
+            :disabled="prefetchIsRunning"
+            @click="startPrefetch"
+          >
+            <Play :size="14" />
+            <span>开始补生成</span>
+          </button>
+          <button
+            class="api-prefetch-btn api-prefetch-btn--stop"
+            type="button"
+            :disabled="!prefetchIsRunning"
+            @click="stopPrefetch"
+          >
+            <Square :size="14" />
+            <span>停止</span>
+          </button>
+        </div>
+
+        <div class="api-prefetch-logs">
+          <div class="api-prefetch-logs__header">
+            <span>最近日志</span>
+            <span v-if="prefetchLogs.length">{{ prefetchLogs.length }} 条</span>
+          </div>
+          <ul v-if="prefetchLogs.length" class="api-prefetch-log-list">
+            <li
+              v-for="log in prefetchLogs"
+              :key="log.id"
+              class="api-prefetch-log"
+              :class="`is-${log.level}`"
+            >
+              <span class="api-prefetch-log__time">{{ formatPrefetchTime(log.at) }}</span>
+              <span v-if="log.word" class="api-prefetch-log__word">{{ log.word }}</span>
+              <span class="api-prefetch-log__msg">{{ log.message }}</span>
+            </li>
+          </ul>
+          <p v-else class="api-prefetch-logs__empty">暂无日志；启动或导入单词后会在此显示</p>
+        </div>
       </section>
 
       <section class="api-section">

@@ -15,6 +15,16 @@ import { todayLocalDate } from '@/utils/localDate'
 
 export type ExamplePrefetchStatus = 'idle' | 'running' | 'paused'
 
+export type ExamplePrefetchLogLevel = 'info' | 'success' | 'error'
+
+export interface ExamplePrefetchLog {
+  id: number
+  at: number
+  level: ExamplePrefetchLogLevel
+  word?: string
+  message: string
+}
+
 type PrefetchListener = (event: {
   status: ExamplePrefetchStatus
   done: number
@@ -26,6 +36,8 @@ type PrefetchListener = (event: {
 const DEFAULT_LIMIT = 20
 /** 词与词之间的间隔，减轻本机 Ollama 压力 */
 const GAP_MS = 1200
+/** 控制台展示用环形日志上限 */
+const LOG_LIMIT = 40
 
 function sleep(ms: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, ms))
@@ -54,6 +66,8 @@ class ExamplePrefetchService {
   private total = 0
   private currentWord = ''
   private listeners = new Set<PrefetchListener>()
+  private logs: ExamplePrefetchLog[] = []
+  private logSeq = 0
   /** 避免 App 启动与导入同时踢两轮 */
   private kickTimer: ReturnType<typeof setTimeout> | null = null
   /** 运行中再次 kick 时，结束后自动再跑一轮 */
@@ -68,9 +82,34 @@ class ExamplePrefetchService {
     }
   }
 
+  /** 最近日志（新→旧），供控制台展示 */
+  getLogs(): ExamplePrefetchLog[] {
+    return this.logs.slice()
+  }
+
   subscribe(listener: PrefetchListener): () => void {
     this.listeners.add(listener)
+    listener({
+      status: this.status,
+      done: this.done,
+      total: this.total,
+      currentWord: this.currentWord || undefined,
+    })
     return () => this.listeners.delete(listener)
+  }
+
+  private pushLog(level: ExamplePrefetchLogLevel, message: string, word?: string) {
+    this.logSeq += 1
+    this.logs.unshift({
+      id: this.logSeq,
+      at: Date.now(),
+      level,
+      word,
+      message,
+    })
+    if (this.logs.length > LOG_LIMIT) {
+      this.logs.length = LOG_LIMIT
+    }
   }
 
   private emit(error?: string) {
@@ -94,10 +133,14 @@ class ExamplePrefetchService {
   kick(options?: { limit?: number; delayMs?: number }) {
     if (this.status === 'running') {
       this.rerunAfter = { limit: options?.limit }
+      this.pushLog('info', '运行中，结束后将再补一轮')
+      this.emit()
       return
     }
     if (this.kickTimer) clearTimeout(this.kickTimer)
     const delayMs = options?.delayMs ?? 2500
+    this.pushLog('info', `已排队，${Math.round(delayMs / 1000)}s 后开始`)
+    this.emit()
     this.kickTimer = setTimeout(() => {
       this.kickTimer = null
       this.start(options).catch((err) => {
@@ -109,14 +152,21 @@ class ExamplePrefetchService {
   stop() {
     this.runId += 1
     this.rerunAfter = null
+    if (this.kickTimer) {
+      clearTimeout(this.kickTimer)
+      this.kickTimer = null
+    }
     this.status = 'idle'
     this.currentWord = ''
+    this.pushLog('info', '已停止')
     this.emit()
   }
 
   async start(options?: { limit?: number }): Promise<void> {
     if (this.status === 'running') {
       this.rerunAfter = { limit: options?.limit }
+      this.pushLog('info', '运行中，结束后将再补一轮')
+      this.emit()
       return
     }
 
@@ -127,6 +177,8 @@ class ExamplePrefetchService {
       !apiConfig.textModel?.trim()
     ) {
       console.info('[example-prefetch] skip: API not configured')
+      this.pushLog('error', '跳过：API 未配置')
+      this.emit('API 未配置')
       return
     }
 
@@ -135,6 +187,7 @@ class ExamplePrefetchService {
     this.done = 0
     this.total = 0
     this.currentWord = ''
+    this.pushLog('info', '开始扫描缺例句单词')
     this.emit()
 
     try {
@@ -147,12 +200,15 @@ class ExamplePrefetchService {
       if (!candidates.length) {
         console.info('[example-prefetch] nothing to generate')
         this.status = 'idle'
+        this.pushLog('info', '无需生成（例句已齐）')
         this.emit()
         this.maybeRerun()
         return
       }
 
       console.info(`[example-prefetch] queue ${candidates.length} words`)
+      this.pushLog('info', `排队 ${candidates.length} 个词`)
+      this.emit()
 
       for (const item of candidates) {
         if (currentRun !== this.runId) return
@@ -163,13 +219,16 @@ class ExamplePrefetchService {
         try {
           await generateQualityExamplesForWord(item.word, item.translation)
           this.done += 1
+          this.pushLog('success', `完成 (${this.done}/${this.total})`, item.word)
           this.emit()
           console.info(`[example-prefetch] ok ${item.word} (${this.done}/${this.total})`)
         } catch (err) {
           // 单个失败不中断队列（小模型偶发 JSON 失败很常见）
+          const reason = err instanceof Error ? err.message : '生成失败'
           console.warn(`[example-prefetch] fail ${item.word}:`, err)
           this.done += 1
-          this.emit(err instanceof Error ? err.message : '生成失败')
+          this.pushLog('error', reason.slice(0, 80), item.word)
+          this.emit(reason)
         }
 
         if (currentRun !== this.runId) return
@@ -179,6 +238,7 @@ class ExamplePrefetchService {
       if (currentRun !== this.runId) return
       this.status = 'idle'
       this.currentWord = ''
+      this.pushLog('info', `本轮结束 ${this.done}/${this.total}`)
       this.emit()
       console.info(`[example-prefetch] finished ${this.done}/${this.total}`)
       this.maybeRerun()
@@ -186,7 +246,9 @@ class ExamplePrefetchService {
       if (currentRun !== this.runId) return
       this.status = 'idle'
       this.currentWord = ''
-      this.emit(err instanceof Error ? err.message : '预生成失败')
+      const reason = err instanceof Error ? err.message : '预生成失败'
+      this.pushLog('error', reason.slice(0, 80))
+      this.emit(reason)
       console.warn('[example-prefetch] aborted:', err)
       this.maybeRerun()
     }

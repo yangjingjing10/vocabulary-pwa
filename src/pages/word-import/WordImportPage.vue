@@ -231,6 +231,13 @@ async function confirmSave() {
 
     emit('save', words.value.map((w) => w.word))
 
+    // 导入后后台静默补例句（已有足够本地/用户例句的会跳过）
+    const { examplePrefetchService } = await import('@/services/example-prefetch.service')
+    examplePrefetchService.kick({
+      limit: Math.min(30, Math.max(10, words.value.length)),
+      delayMs: 1500,
+    })
+
     const phraseNote = filledPhrases > 0 ? `，短语补全 ${filledPhrases}` : ''
     if (missed > 0) {
       showToast(

@@ -26,6 +26,7 @@ import { wallpaperService } from '@/services/wallpaper.service'
 import { fontService } from '@/services/font.service'
 import { ensureLocalDictionary } from '@/services/local-dictionary.service'
 import { articleGenerationService } from '@/services/article-generation.service'
+import { examplePrefetchService } from '@/services/example-prefetch.service'
 import { mixYesterdayWrongWords } from '@/services/practice-mix.service'
 import { peekUnfinishedQuizBatch } from '@/pages/word-quiz/composables/useQuizPause'
 import { getUserProfile } from '@/db/repositories/user-profile.repository'
@@ -40,9 +41,14 @@ registerSW({ immediate: true })
 onMounted(async () => {
   await wallpaperService.init()
   await fontService.init()
-  ensureLocalDictionary().catch((err) => {
-    console.warn('[local-dict] background import failed:', err)
-  })
+  ensureLocalDictionary()
+    .then(() => {
+      // 本地词库就绪后，静默给缺例句的词预生成（不弹 toast）
+      examplePrefetchService.kick({ limit: 20, delayMs: 3000 })
+    })
+    .catch((err) => {
+      console.warn('[local-dict] background import failed:', err)
+    })
   const profile = await getUserProfile()
   if (profile) {
     profileUser.value.name = profile.name

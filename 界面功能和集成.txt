@@ -519,6 +519,9 @@ src/services/speech.service.ts
 src/services/example-generation.service.ts
   — 测验中按需调用 LLM 生成可推义例句并写入本地索引。
 
+src/services/example-prefetch.service.ts
+  — 后台静默为缺例句单词预生成（启动/导入后排队，今日词优先；不弹 toast）。
+
 src/services/wallpaper.service.ts
   — 应用 CSS 壁纸变量、轮播定时与变更订阅。
 

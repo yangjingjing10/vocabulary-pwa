@@ -250,6 +250,9 @@ export interface GenerateExamplesOptions {
   force?: boolean
 }
 
+/** 同一词并发生成去重（后台预取与测验手动点生成） */
+const inFlight = new Map<string, Promise<LocalExampleItem[]>>()
+
 /**
  * 用用户配置的 LLM 为目标词生成高质量可推义例句，并写入用户例句库（可备份、重建词包不丢）
  */
@@ -262,6 +265,26 @@ export async function generateQualityExamplesForWord(
   if (!key) throw new Error('单词为空')
 
   const force = Boolean(opts.force)
+  if (!force) {
+    const pending = inFlight.get(key)
+    if (pending) return pending
+  }
+
+  const task = generateQualityExamplesForWordUniq(key, word, gloss, force)
+  if (!force) inFlight.set(key, task)
+  try {
+    return await task
+  } finally {
+    if (inFlight.get(key) === task) inFlight.delete(key)
+  }
+}
+
+async function generateQualityExamplesForWordUniq(
+  key: string,
+  word: string,
+  gloss: string | undefined,
+  force: boolean,
+): Promise<LocalExampleItem[]> {
   const previousUser = await getUserExamplesForWord(key)
 
   // 非强制且已有足够用户/AI 例句则直接复用，避免重复消耗 token

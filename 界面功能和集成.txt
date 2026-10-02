@@ -637,4 +637,5 @@ src/styles/pages/profile/data-backup-page.css
    【给后续 AI 的固定约定】
    - 完成本次功能/修复后，若工作区有未提交改动：先 git add → git commit → git push origin HEAD
    - 无需再向用户确认是否推送（用户已授权本仓库自动推送）
-   - 不�
+   - 不要 force push；不要改 git config；不要提交含密钥的 .env / credentials
+   - 同步约定也写在：.cursor/rules/auto-push-github.mdc（alwaysApply）

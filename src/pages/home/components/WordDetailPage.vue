@@ -259,17 +259,18 @@ function toggleEnglish() {
   englishExpanded.value = !englishExpanded.value
 }
 
+/** Android WebView：父级滑动手势常吞掉 click；用 touchend 直接切换，并拦住后续 click 防连点 */
+function onToggleTouch(e: TouchEvent, toggle: () => void) {
+  e.preventDefault()
+  e.stopPropagation()
+  isDragging = false
+  toggle()
+}
+
 function onRelatedClick(hit: RelatedWordHit) {
   if (typeof hit.index === 'number') {
     void jumpToIndex(hit.index)
   }
-}
-
-function isInteractiveTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof Element)) return false
-  return Boolean(
-    target.closest('button, a, input, textarea, select, label, [role="button"]'),
-  )
 }
 
 function onPointerDown(clientX: number) {
@@ -287,8 +288,8 @@ function onPointerUp(clientX: number) {
 }
 
 function onTouchStart(e: TouchEvent) {
-  // 交互控件上不启动滑动手势，避免吞掉 click
-  if (isInteractiveTarget(e.target)) {
+  // 点在按钮上：不进入滑动，交给按钮自己的 touchend
+  if (e.target instanceof Element && e.target.closest('button')) {
     isDragging = false
     return
   }
@@ -299,10 +300,8 @@ function onTouchEnd(e: TouchEvent) {
   if (!isDragging) return
   const deltaX = e.changedTouches[0].clientX - dragStartX
   isDragging = false
-
-  // 轻点不 preventDefault，否则 Android 上后续 click 不会触发（展开按钮失效）
+  // 轻点绝不 preventDefault，否则整页 click 失效
   if (Math.abs(deltaX) < TAP_THRESHOLD) return
-
   e.preventDefault()
   if (deltaX < 0) void goTo('next')
   else void goTo('prev')
@@ -411,6 +410,7 @@ onUnmounted(() => {
                 type="button"
                 :aria-expanded="englishExpanded"
                 @click.stop="toggleEnglish"
+                @touchend="(e) => onToggleTouch(e, toggleEnglish)"
               >
                 <span class="word-detail__section-title">英文释义</span>
                 <span class="word-detail__section-meta">
@@ -480,6 +480,7 @@ onUnmounted(() => {
                   type="button"
                   :aria-expanded="phrasesExpanded"
                   @click.stop="togglePhrases"
+                  @touchend="(e) => onToggleTouch(e, togglePhrases)"
                 >
                   <span>{{ phrasesExpanded ? '收起' : `展开另外 ${hiddenPhraseCount} 条` }}</span>
                   <ChevronDown
@@ -498,6 +499,7 @@ onUnmounted(() => {
                 type="button"
                 :aria-expanded="relatedExpanded"
                 @click.stop="toggleRelated"
+                @touchend="(e) => onToggleTouch(e, toggleRelated)"
               >
                 <span class="word-detail__section-title">相近词</span>
                 <span class="word-detail__section-meta">
@@ -558,6 +560,7 @@ onUnmounted(() => {
                   type="button"
                   :aria-expanded="examplesExpanded"
                   @click.stop="toggleExamples"
+                  @touchend="(e) => onToggleTouch(e, toggleExamples)"
                 >
                   <span>{{ examplesExpanded ? '收起' : `展开另外 ${hiddenExampleCount} 条` }}</span>
                   <ChevronDown

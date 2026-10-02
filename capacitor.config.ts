@@ -14,10 +14,10 @@ const config: CapacitorConfig = {
     allowMixedContent: true,
   },
   plugins: {
-    // Android WebView <140 时 env(safe-area-*) 不可靠，注入 --safe-area-inset-*
+    // disable：避免原生给 WebView 加外边距（会在壁纸上方露出大白块）
+    // 顶部避让改由前端 CSS --app-safe-top 处理
     SystemBars: {
-      insetsHandling: 'css',
-      initialViewportFitValueHint: 'cover',
+      insetsHandling: 'disable',
       style: 'DARK',
     },
   },

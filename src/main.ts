@@ -4,7 +4,9 @@ import App from './App.vue'
 import './styles/index.css'
 import { wallpaperService } from './services/wallpaper.service'
 import { fontService } from './services/font.service'
+import { initSafeArea } from './utils/safeArea'
 
+initSafeArea()
 wallpaperService.init()
 fontService.init()
 

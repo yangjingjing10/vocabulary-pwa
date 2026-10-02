@@ -224,7 +224,7 @@ src/pages/word-quiz/WordQuizPage.vue
 
 【组件】
 src/pages/word-quiz/components/QuizQuestion.vue
-  — 单题作答区：语境题干、输入、即时对错反馈与继续。
+  — 单题作答区：语境题干、输入、即时对错反馈与继续；判错且有作答时可点「算我对」改记为正确。
 
 src/pages/word-quiz/components/WordCarousel.vue
   — 测验题干：始终显示当前单词。
@@ -243,7 +243,7 @@ src/pages/word-quiz/components/QuizResumeDialog.vue
 
 【Composables】
 src/pages/word-quiz/composables/useQuizState.ts
-  — 测验题目队列、即时反馈、错题再入队与完成状态。
+  — 测验题目队列、即时反馈、错题再入队、「算我对」覆盖判题与完成状态。
 
 src/pages/word-quiz/composables/useQuizPause.ts
   — 按日期隔离的暂停批次持久化与续测。

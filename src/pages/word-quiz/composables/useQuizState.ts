@@ -193,6 +193,26 @@ export function useQuizState(initialWords: string[], options: UseQuizStateOption
   }
 
   /**
+   * 判错后用户认领近义/等价答案：改记为正确，不再入错题重练
+   * 仅当已作答（非空跳过）且当前为错时可用
+   */
+  function overrideAsCorrect(): 'ok' | 'rejected' {
+    if (!isAnswerLocked.value) return 'rejected'
+
+    const question = questions.value[currentQuestionIndex.value]
+    if (!question?.gradeResult) return 'rejected'
+    if (question.gradeResult.isCorrect) return 'rejected'
+    if (!question.userAnswer.trim()) return 'rejected'
+
+    question.gradeResult = {
+      isCorrect: true,
+      correctAnswer: question.gradeResult.correctAnswer,
+    }
+    answerFeedback.value = 'correct'
+    return 'ok'
+  }
+
+  /**
    * 错题（或跳过）在未达上限时再入队一次，换一种题干形态优先
    */
   async function maybeRequeueWrong(question: QuizQuestion): Promise<void> {
@@ -336,6 +356,7 @@ export function useQuizState(initialWords: string[], options: UseQuizStateOption
     submitCurrentAnswer,
     skipQuestion,
     markQuestionKnown,
+    overrideAsCorrect,
     acknowledgeFeedback,
     collectGradedResults,
     setResults,

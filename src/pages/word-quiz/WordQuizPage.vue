@@ -345,6 +345,10 @@ async function handleKnown() {
   }
 }
 
+function handleOverrideCorrect() {
+  overrideAsCorrect()
+}
+
 async function handleAcknowledge() {
   const indexBefore = currentQuestionIndex.value
   const question = questions.value[indexBefore]
@@ -581,6 +585,7 @@ const resultsTitle = computed(() =>
         @next="handleNext"
         @skip="handleSkip"
         @known="handleKnown"
+        @override-correct="handleOverrideCorrect"
         @acknowledge="handleAcknowledge"
       />
 

@@ -22,6 +22,8 @@ interface Emits {
   (e: 'skip'): void
   (e: 'known'): void
   (e: 'acknowledge'): void
+  /** 判错后认领自己的答案为正确 */
+  (e: 'override-correct'): void
 }
 
 const props = defineProps<Props>()
@@ -54,6 +56,14 @@ const feedbackText = computed(() => {
   }
   return ''
 })
+
+/** 写了答案却被判错时，可认领近义/等价译法 */
+const canOverrideCorrect = computed(
+  () =>
+    props.isAnswerLocked &&
+    props.answerFeedback === 'wrong' &&
+    Boolean(props.question.userAnswer.trim()),
+)
 
 function handleKeyDown(event: KeyboardEvent) {
   if (event.key !== 'Enter') return
@@ -102,13 +112,23 @@ function handleKeyDown(event: KeyboardEvent) {
         <div class="quiz-feedback__answer">
           {{ feedbackCorrectAnswer }}
         </div>
-        <button
-          type="button"
-          class="quiz-feedback__continue"
-          @click="emit('acknowledge')"
-        >
-          继续
-        </button>
+        <div class="quiz-feedback__actions">
+          <button
+            v-if="canOverrideCorrect"
+            type="button"
+            class="quiz-feedback__override"
+            @click="emit('override-correct')"
+          >
+            算我对
+          </button>
+          <button
+            type="button"
+            class="quiz-feedback__continue"
+            @click="emit('acknowledge')"
+          >
+            继续
+          </button>
+        </div>
       </div>
     </div>
 

@@ -6,6 +6,12 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https',
+    // 允许访问局域网 http://IP:11434（Ollama）
+    cleartext: true,
+  },
+  android: {
+    // https WebView 内请求 http Ollama
+    allowMixedContent: true,
   },
 }
 

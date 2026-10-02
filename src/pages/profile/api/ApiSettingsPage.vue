@@ -24,6 +24,8 @@ interface Provider {
   name: string
   baseUrl: string
   model: string
+  /** 选中时自动填入；Ollama 任意非空即可 */
+  apiKey?: string
 }
 
 interface ModelItem {
@@ -45,7 +47,15 @@ const providers: Provider[] = [
   { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
   { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
   { id: 'siliconflow', name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-72B-Instruct' },
-  { id: 'custom', name: 'Custom', baseUrl: '', model: 'custom' }
+  {
+    id: 'ollama',
+    name: 'Ollama',
+    // 占位：请改成电脑局域网 IP；手机与电脑须同一 Wi‑Fi
+    baseUrl: 'http://192.168.1.100:11434/v1',
+    model: 'qwen2.5',
+    apiKey: 'ollama',
+  },
+  { id: 'custom', name: 'Custom', baseUrl: '', model: 'custom' },
 ]
 
 const dictProviderTemplates: DictProviderTemplate[] = [
@@ -93,6 +103,22 @@ const speechSupported = ref(typeof window !== 'undefined' && 'speechSynthesis' i
 const previewWord = ref('vocabulary')
 
 const effectiveTextModel = computed(() => config.value.textModel === 'custom' ? customTextModel.value : config.value.textModel)
+const isOllama = computed(() => selectedProvider.value === 'ollama' || /:11434\b/i.test(config.value.baseUrl))
+const effectiveApiKey = computed(() => {
+  const key = config.value.apiKey.trim()
+  if (key) return key
+  return isOllama.value ? 'ollama' : ''
+})
+
+function detectProviderFromUrl(baseUrl: string): string {
+  const url = baseUrl.trim().toLowerCase()
+  if (/:11434\b/.test(url) || url.includes('ollama')) return 'ollama'
+  if (url.includes('deepseek')) return 'deepseek'
+  if (url.includes('openai.com')) return 'openai'
+  if (url.includes('siliconflow')) return 'siliconflow'
+  if (!url) return 'custom'
+  return 'custom'
+}
 
 onMounted(async () => {
   const savedConfig = await getApiConfig()
@@ -106,7 +132,8 @@ onMounted(async () => {
       visionApiKey: savedConfig.visionApiKey,
       visionModel: savedConfig.visionModel
     }
-    if (savedConfig.apiKey) {
+    selectedProvider.value = detectProviderFromUrl(savedConfig.baseUrl)
+    if (savedConfig.apiKey || isOllama.value) {
       await fetchModels()
       config.value.textModel = savedConfig.textModel
     }
@@ -154,30 +181,44 @@ function selectProvider(providerId: string) {
   if (!provider || provider.id === 'custom') return
   config.value.baseUrl = provider.baseUrl
   config.value.textModel = provider.model
+  if (provider.apiKey) {
+    config.value.apiKey = provider.apiKey
+  }
   fetchedModels.value = []
   fetchStatusMessage.value = ''
   showToast(`Loaded ${provider.name} preset`)
 }
 
 function resetBaseUrl() {
-  config.value.baseUrl = 'https://api.deepseek.com/v1'
-  showToast('Reset to default URL')
+  const provider = providers.find((item) => item.id === selectedProvider.value)
+  config.value.baseUrl = provider?.baseUrl || 'https://api.deepseek.com/v1'
+  showToast('Reset to preset URL')
 }
 
 async function fetchModels() {
-  if (!config.value.apiKey.trim()) {
+  const apiKey = effectiveApiKey.value
+  if (!apiKey) {
     showToast('Enter API Key first', 'error')
     return
+  }
+  if (!config.value.baseUrl.trim()) {
+    showToast('Enter Base URL first', 'error')
+    return
+  }
+  if (!config.value.apiKey.trim() && isOllama.value) {
+    config.value.apiKey = 'ollama'
   }
   isFetchingModels.value = true
   fetchStatusMessage.value = ''
   const startedAt = performance.now()
   const url = `${config.value.baseUrl.trim().replace(/\/+$/, '')}/models`
   const controller = new AbortController()
-  const timeoutId = window.setTimeout(() => controller.abort(), 8000)
+  // 局域网 / 冷启动 Ollama 可能稍慢
+  const timeoutMs = isOllama.value ? 20000 : 8000
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
   try {
     const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${config.value.apiKey}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       signal: controller.signal
     })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -187,7 +228,11 @@ async function fetchModels() {
       : []
     if (!models.length) throw new Error('No models returned')
     fetchedModels.value = models
-    config.value.textModel = models[0].id
+    const preferred =
+      models.find((m) => /qwen2\.5/i.test(m.id)) ||
+      models.find((m) => /qwen/i.test(m.id)) ||
+      models[0]
+    config.value.textModel = preferred!.id
     testResult.value = { success: true, latency: Math.round(performance.now() - startedAt) }
     fetchStatusSuccess.value = true
     fetchStatusMessage.value = `Fetched ${models.length} models`
@@ -249,14 +294,17 @@ async function testApiConnection() {
 }
 
 async function saveConfiguration() {
-  if (!config.value.baseUrl.trim() || !config.value.apiKey.trim() || !effectiveTextModel.value.trim()) {
+  if (isOllama.value && !config.value.apiKey.trim()) {
+    config.value.apiKey = 'ollama'
+  }
+  if (!config.value.baseUrl.trim() || !effectiveApiKey.value || !effectiveTextModel.value.trim()) {
     showToast('Complete all required fields', 'error')
     return
   }
   try {
     await saveApiConfig({
       baseUrl: config.value.baseUrl,
-      apiKey: config.value.apiKey,
+      apiKey: effectiveApiKey.value,
       textModel: effectiveTextModel.value,
       useIndependentVision: config.value.useIndependentVision,
       visionBaseUrl: config.value.visionBaseUrl,
@@ -402,14 +450,42 @@ async function testDictionaryApi(config: DictionaryApiConfig) {
           <div><h2>Text Generation Model</h2><p>For articles and definitions</p></div>
           <span>Primary</span>
         </div>
+
+        <div v-if="isOllama" class="api-ollama-tip">
+          <strong>手机连电脑 Ollama（Qwen2.5）</strong>
+          <ol>
+            <li>电脑安装 <a href="https://ollama.com" target="_blank" rel="noopener">Ollama</a>，执行：<code>ollama pull qwen2.5</code></li>
+            <li>让 Ollama 监听局域网（默认只认本机）。Windows 可设用户环境变量后<strong>重启 Ollama</strong>：
+              <code>OLLAMA_HOST=0.0.0.0:11434</code>
+              <code>OLLAMA_ORIGINS=*</code>
+            </li>
+            <li>电脑查局域网 IP（PowerShell：<code>ipconfig</code> 看无线网卡 IPv4），例如 <code>192.168.1.23</code></li>
+            <li>下方 Base URL 改成：<code>http://你的IP:11434/v1</code>（须带 <code>/v1</code>）</li>
+            <li>手机与电脑连<strong>同一 Wi‑Fi</strong>；Windows 防火墙放行 11434 端口</li>
+            <li>点 Fetch Models → 选中 qwen2.5 → Save</li>
+          </ol>
+          <p class="api-ollama-tip__warn">
+            若 App 是用 <strong>https://</strong> 打开的（如线上部署），浏览器会拦截访问局域网 http，连不上。
+            请用电脑局域网 http 地址打开本 App，或给 Ollama 套一层 https 隧道后再填地址。
+          </p>
+        </div>
+
         <label class="api-field">
           <span>API Base URL<button type="button" @click="resetBaseUrl">Reset</button></span>
-          <input v-model="config.baseUrl" type="url" placeholder="https://api.deepseek.com/v1" />
+          <input
+            v-model="config.baseUrl"
+            type="url"
+            :placeholder="isOllama ? 'http://192.168.1.23:11434/v1' : 'https://api.deepseek.com/v1'"
+          />
         </label>
         <label class="api-field">
-          <span>API Key</span>
+          <span>{{ isOllama ? 'API Key（Ollama 任意填写）' : 'API Key' }}</span>
           <span class="api-input-wrap">
-            <input v-model="config.apiKey" :type="showApiKey ? 'text' : 'password'" placeholder="sk-xxxx" />
+            <input
+              v-model="config.apiKey"
+              :type="showApiKey ? 'text' : 'password'"
+              :placeholder="isOllama ? 'ollama' : 'sk-xxxx'"
+            />
             <button type="button" @click="showApiKey = !showApiKey">
               <EyeOff v-if="showApiKey" :size="15" />
               <Eye v-else :size="15" />
@@ -425,6 +501,7 @@ async function testDictionaryApi(config: DictionaryApiConfig) {
             <option v-for="model in fetchedModels" :key="model.id" :value="model.id">{{ model.id }}</option>
             <option v-if="!fetchedModels.length" value="deepseek-chat">deepseek-chat</option>
             <option v-if="!fetchedModels.length" value="gpt-4o-mini">gpt-4o-mini</option>
+            <option v-if="!fetchedModels.length" value="qwen2.5">qwen2.5</option>
             <option value="custom">Custom</option>
           </select>
         </label>

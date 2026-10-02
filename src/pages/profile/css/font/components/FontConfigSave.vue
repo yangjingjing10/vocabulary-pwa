@@ -38,7 +38,7 @@ function handleUpdate() {
     <h2 class="font-section__title">保存 / 更新配置</h2>
     <p class="font-section__desc">
       <template v-if="isEditing">已选中下方配置，可直接更新；也可另存为新配置</template>
-      <template v-else>为当前字体与颜色命名并永久保存</template>
+      <template v-else>为当前字体、颜色与字号命名并永久保存（含系统默认字体）</template>
       <template v-if="currentFontFamily">（当前：{{ currentFontFamily }}）</template>
     </p>
 

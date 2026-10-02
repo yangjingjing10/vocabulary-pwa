@@ -74,15 +74,23 @@ class FontService {
 
   /**
    * 注入 @font-face，字体系列 / 颜色 / 字号全局生效
+   * source=system 时不注入自定义字体，只恢复系统字族并应用颜色/字号
    */
   async applyFontConfig(config: FontConfig): Promise<boolean> {
-    const src = config.source === 'file' ? config.fileData : config.url
-    if (!src) {
-      console.warn('[FontService] missing font source')
-      return false
-    }
-
     try {
+      if (config.source === 'system') {
+        this.applySystemFont()
+        this.applyRootStyles(config)
+        this.currentConfig = config
+        return true
+      }
+
+      const src = config.source === 'file' ? config.fileData : config.url
+      if (!src) {
+        console.warn('[FontService] missing font source')
+        return false
+      }
+
       await this.injectFontFace(config.fontFamily, src)
       this.applyRootStyles(config)
       this.currentConfig = config
@@ -185,10 +193,15 @@ class FontService {
       config.fontSize ?? readStoredFontSize() ?? DEFAULT_FONT_SIZE,
     )
 
-    root.style.setProperty('--app-font-family', `"${config.fontFamily}", sans-serif`)
+    if (config.source === 'system') {
+      root.style.setProperty('--app-font-family', SYSTEM_FONT_FAMILY)
+      root.style.fontFamily = SYSTEM_FONT_FAMILY
+    } else {
+      root.style.setProperty('--app-font-family', `"${config.fontFamily}", sans-serif`)
+      root.style.fontFamily = `"${config.fontFamily}", sans-serif`
+    }
     this.applyFontColor(color)
     this.applyFontSize(fontSize)
-    root.style.fontFamily = `"${config.fontFamily}", sans-serif`
     root.classList.add('app-chrome-font-custom')
     root.style.removeProperty('color')
   }

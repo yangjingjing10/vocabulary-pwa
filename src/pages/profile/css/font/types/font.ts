@@ -1,8 +1,14 @@
-/** 字体配置来源 */
-export type FontSource = 'file' | 'url'
+/** 字体资源来源（真实文件 / 链接） */
+export type FontAssetSource = 'file' | 'url'
+
+/** 字体配置来源（含系统默认，无需上传文件） */
+export type FontSource = FontAssetSource | 'system'
 
 /** 下拉中的系统默认选项 id */
 export const SYSTEM_FONT_ASSET_ID = '__system__'
+
+/** 系统默认配置在列表中的展示名 */
+export const SYSTEM_FONT_LABEL = '系统默认字体'
 
 /** 手机 / 系统默认字体栈 */
 export const SYSTEM_FONT_FAMILY =
@@ -13,7 +19,7 @@ export interface FontAsset {
   id: string
   /** 展示名称 */
   name: string
-  source: FontSource
+  source: FontAssetSource
   fontFamily: string
   fileData?: string
   url?: string

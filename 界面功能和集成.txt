@@ -359,10 +359,10 @@ src/pages/profile/css/font/index.vue
   — 字体设置页：资源库、颜色字号、命名配置列表。
 
 src/pages/profile/css/font/composables/useFontSetting.ts
-  — 字体资源/配置 CRUD、草稿编辑与全局应用逻辑。
+  — 字体资源/配置 CRUD、草稿编辑与全局应用逻辑；系统默认字体可命名保存/更新。
 
 src/pages/profile/css/font/types/font.ts
-  — 字体资源、配置、草稿与默认字号颜色常量。
+  — 字体资源、配置、草稿与默认字号颜色常量；FontSource 含 file / url / system。
 
 src/pages/profile/css/font/components/FontPreview.vue
   — 当前草稿字体效果预览。

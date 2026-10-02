@@ -40,8 +40,19 @@ const emit = defineEmits<{
           <div class="font-config-item__info">
             <strong>{{ config.name }}</strong>
             <span>
-              {{ config.fontFamily }}
-              · {{ config.source === 'file' ? '本地' : '链接' }}
+              {{
+                config.source === 'system'
+                  ? '系统默认字体'
+                  : config.fontFamily
+              }}
+              ·
+              {{
+                config.source === 'file'
+                  ? '本地'
+                  : config.source === 'url'
+                    ? '链接'
+                    : '系统'
+              }}
             </span>
           </div>
         </button>

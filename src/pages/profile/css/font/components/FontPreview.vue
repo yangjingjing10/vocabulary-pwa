@@ -1,9 +1,17 @@
 <script setup lang="ts">
+import { SYSTEM_FONT_FAMILY, SYSTEM_FONT_LABEL } from '../types/font'
+
 defineProps<{
   fontFamily: string
   color: string
   fontSize: number
 }>()
+
+/** 系统默认用字体栈；自定义字体需加引号 */
+function previewFontFamily(family: string): string | undefined {
+  if (!family || family === SYSTEM_FONT_LABEL) return SYSTEM_FONT_FAMILY
+  return `'${family}', sans-serif`
+}
 </script>
 
 <template>
@@ -12,13 +20,13 @@ defineProps<{
     <div
       class="font-preview"
       :style="{
-        fontFamily: fontFamily ? `'${fontFamily}', sans-serif` : undefined,
+        fontFamily: previewFontFamily(fontFamily),
         color,
         fontSize: `${fontSize}px`,
       }"
     >
       <p class="font-preview__sample">
-        {{ fontFamily || '系统默认字体' }}
+        {{ fontFamily || SYSTEM_FONT_LABEL }}
       </p>
       <p class="font-preview__pangram">
         The quick brown fox jumps over the lazy dog.

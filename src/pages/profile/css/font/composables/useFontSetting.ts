@@ -19,6 +19,7 @@ import {
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
   SYSTEM_FONT_ASSET_ID,
+  SYSTEM_FONT_LABEL,
   type FontDraft,
   type FontSource
 } from '../types/font'
@@ -79,7 +80,11 @@ export function useFontSetting() {
 
   const isEditingExisting = computed(() => Boolean(editingConfigId.value))
 
-  const canSave = computed(() => Boolean(draft.value.source && draft.value.fontFamily))
+  /** 系统默认字体也可保存（不必上传文件） */
+  const canSave = computed(() => {
+    if (draft.value.source === 'system') return true
+    return Boolean(draft.value.source && draft.value.fontFamily)
+  })
 
   function showError(message: string) {
     errorMessage.value = message
@@ -111,12 +116,13 @@ export function useFontSetting() {
       if (selected) {
         editingConfigId.value = selected.id
         editingConfigName.value = selected.name
+        const isSystem = selected.source === 'system'
         draft.value = {
           source: selected.source,
-          fontFamily: selected.fontFamily,
-          fontAssetId: selected.fontAssetId,
-          fileData: selected.fileData,
-          url: selected.url,
+          fontFamily: isSystem ? SYSTEM_FONT_LABEL : selected.fontFamily,
+          fontAssetId: isSystem ? SYSTEM_FONT_ASSET_ID : selected.fontAssetId,
+          fileData: isSystem ? undefined : selected.fileData,
+          url: isSystem ? undefined : selected.url,
           color: selected.color ?? DEFAULT_FONT_COLOR,
           fontSize: clampFontSize(selected.fontSize ?? DEFAULT_FONT_SIZE),
         }
@@ -127,11 +133,11 @@ export function useFontSetting() {
     }
   }
 
-  /** 将配置中的字体补录到 fontAssets（不重复） */
+  /** 将配置中的字体补录到 fontAssets（不重复）；系统默认无需入库 */
   async function syncAssetsFromConfigs() {
     let changed = false
     for (const config of configs.value) {
-      if (!config.fontFamily) continue
+      if (config.source === 'system' || !config.fontFamily) continue
       const srcOk =
         (config.source === 'file' && config.fileData) ||
         (config.source === 'url' && config.url)
@@ -174,7 +180,7 @@ export function useFontSetting() {
   /** 把草稿里的字体写入资源库（供下拉复用） */
   async function persistFontAsset(params: {
     name: string
-    source: FontSource
+    source: Exclude<FontSource, 'system'>
     fontFamily: string
     fileData?: string
     url?: string
@@ -362,7 +368,7 @@ export function useFontSetting() {
     }
   }
 
-  /** 切回手机系统默认字体，保留颜色与字号 */
+  /** 切回手机系统默认字体，保留颜色与字号；可命名保存为配置 */
   async function selectSystemDefault(): Promise<boolean> {
     loading.value = true
     try {
@@ -375,25 +381,18 @@ export function useFontSetting() {
         fontSize: keepSize,
       })
 
+      // 与选择已上传字体一致：只改草稿，不打断「更新已有配置」流程
       draft.value = {
-        source: null,
-        fontFamily: '',
-        fontAssetId: undefined,
+        source: 'system',
+        fontFamily: SYSTEM_FONT_LABEL,
+        fontAssetId: SYSTEM_FONT_ASSET_ID,
         fileData: undefined,
         url: undefined,
         color: keepColor,
         fontSize: keepSize,
       }
 
-      activeConfigId.value = null
-      editingConfigId.value = null
-      editingConfigName.value = ''
-      await clearCurrentFontConfig()
-      configs.value.forEach((c) => {
-        c.isSelected = false
-      })
-
-      showSuccess('已切回系统默认字体')
+      showSuccess('已切回系统默认字体，可命名保存')
       return true
     } catch (error) {
       console.error('[useFontSetting] select system default failed:', error)
@@ -439,8 +438,9 @@ export function useFontSetting() {
   }
 
   function validateDraftForSave(): boolean {
+    if (draft.value.source === 'system') return true
     if (!draft.value.source || !draft.value.fontFamily) {
-      showError('请先上传字体、粘贴链接或从下拉选择字体')
+      showError('请先选择系统默认、上传字体、粘贴链接或从下拉选择字体')
       return false
     }
     if (draft.value.source === 'file' && !draft.value.fileData) {
@@ -452,6 +452,26 @@ export function useFontSetting() {
       return false
     }
     return true
+  }
+
+  /** 从草稿组装可持久化的字体字段 */
+  function draftFontFields() {
+    if (draft.value.source === 'system') {
+      return {
+        source: 'system' as FontSource,
+        fontFamily: SYSTEM_FONT_LABEL,
+        fontAssetId: SYSTEM_FONT_ASSET_ID,
+        fileData: undefined as string | undefined,
+        url: undefined as string | undefined,
+      }
+    }
+    return {
+      source: draft.value.source as FontSource,
+      fontFamily: draft.value.fontFamily,
+      fontAssetId: draft.value.fontAssetId,
+      fileData: draft.value.fileData,
+      url: draft.value.url,
+    }
   }
 
   /** 新建配置 */
@@ -469,11 +489,7 @@ export function useFontSetting() {
       const config: FontConfig = {
         id: `font-${now}`,
         name: trimmed,
-        source: draft.value.source as FontSource,
-        fontFamily: draft.value.fontFamily,
-        fontAssetId: draft.value.fontAssetId,
-        fileData: draft.value.fileData,
-        url: draft.value.url,
+        ...draftFontFields(),
         color: draft.value.color,
         fontSize: draft.value.fontSize,
         isSelected: true,
@@ -530,11 +546,7 @@ export function useFontSetting() {
       const updated: FontConfig = {
         ...existing,
         name: trimmed,
-        source: draft.value.source as FontSource,
-        fontFamily: draft.value.fontFamily,
-        fontAssetId: draft.value.fontAssetId,
-        fileData: draft.value.fileData,
-        url: draft.value.url,
+        ...draftFontFields(),
         color: draft.value.color,
         fontSize: draft.value.fontSize,
         isSelected: true,
@@ -594,10 +606,12 @@ export function useFontSetting() {
 
       draft.value = {
         source: config.source,
-        fontFamily: config.fontFamily,
-        fontAssetId: config.fontAssetId,
-        fileData: config.fileData,
-        url: config.url,
+        fontFamily:
+          config.source === 'system' ? SYSTEM_FONT_LABEL : config.fontFamily,
+        fontAssetId:
+          config.source === 'system' ? SYSTEM_FONT_ASSET_ID : config.fontAssetId,
+        fileData: config.source === 'system' ? undefined : config.fileData,
+        url: config.source === 'system' ? undefined : config.url,
         color: config.color ?? DEFAULT_FONT_COLOR,
         fontSize: clampFontSize(config.fontSize ?? DEFAULT_FONT_SIZE),
       }
@@ -645,11 +659,17 @@ export function useFontSetting() {
   async function resetToDefault() {
     const keepSize = draft.value.fontSize
     fontService.clearFont()
-    // clearFont 会清字号；用户若只想回默认字族，顶部重置仍恢复默认字号与颜色
-    draft.value = createDefaultDraft()
-    // 再显式套上系统字族，并保留刚重置后的默认字号
+    // clearFont 会清字号；顶部重置恢复系统字族 + 默认颜色，字号可保留
     fontService.applySystemFont()
-    fontService.applyFontSize(draft.value.fontSize || keepSize || DEFAULT_FONT_SIZE)
+    const nextSize = keepSize || DEFAULT_FONT_SIZE
+    fontService.applyFontSize(nextSize)
+    draft.value = {
+      source: 'system',
+      fontFamily: SYSTEM_FONT_LABEL,
+      fontAssetId: SYSTEM_FONT_ASSET_ID,
+      color: DEFAULT_FONT_COLOR,
+      fontSize: nextSize,
+    }
     activeConfigId.value = null
     editingConfigId.value = null
     editingConfigName.value = ''
@@ -657,7 +677,7 @@ export function useFontSetting() {
     configs.value.forEach((c) => {
       c.isSelected = false
     })
-    showSuccess('已恢复默认字体')
+    showSuccess('已恢复默认字体，可命名保存')
   }
 
   onMounted(async () => {

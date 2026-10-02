@@ -151,6 +151,13 @@ export async function generateQualityExamplesForWord(
   const key = word.trim().toLowerCase()
   if (!key) throw new Error('单词为空')
 
+  // 已有足够用户/AI 例句则直接复用，避免重复消耗 token
+  const previousUser = await getUserExamplesForWord(key)
+  const previousWithTranslation = previousUser.filter((e) => e.translation?.trim())
+  if (previousWithTranslation.length >= 2) {
+    return previousWithTranslation.slice(0, 3)
+  }
+
   const apiConfig = await getApiConfig()
   if (
     !apiConfig?.baseUrl?.trim() ||
@@ -196,7 +203,6 @@ export async function generateQualityExamplesForWord(
 
   if (generated.length === 0) throw new Error('AI 未返回可用例句')
 
-  const previousUser = await getUserExamplesForWord(key)
   const merged = mergeExamples(previousUser, generated)
   await putLocalExamplesForWord(key, merged)
 

@@ -616,3 +616,15 @@ src/styles/pages/profile/data-backup-page.css
 
 6. 本文档后续可扩展
    「界面集成关系 / 页面跳转图 / 数据流」等章节可在此文件继续追加。
+
+7. GitHub 远程仓库（AI 完成后请自动推送）
+   仓库地址：https://github.com/yangjingjing10/vocabulary-pwa.git
+   默认分支：main
+   remote 名：origin
+
+   【给后续 AI 的固定约定】
+   - 完成本次功能/修复后，若工作区有未提交改动：先 git add → git commit → git push origin HEAD
+   - 无需再向用户确认是否推送（用户已授权本仓库自动推送）
+   - 不要 force push；不要改 git config；不要提交含密钥的 .env / credentials
+   - 提交说明用英文、简洁，说明 why（与本仓库既有 commit 风格一致）
+   - 同步约定也写在：.cursor/rules/auto-push-github.mdc（alwaysApply）

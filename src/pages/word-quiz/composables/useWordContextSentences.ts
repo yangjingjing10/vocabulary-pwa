@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import type { LocalExampleItem } from '@/db/schema/database'
+import { getUserExamplesForWord } from '@/db/repositories/local-dict.repository'
 import {
   ensureLocalDictionary,
   lookupLocalExamples,
@@ -8,6 +9,7 @@ import { generateQualityExamplesForWord } from '@/services/example-generation.se
 import { highlightWordInText } from '../utils/highlightWord'
 import {
   hasEnoughQualityExamples,
+  QUALITY_EXAMPLE_LIMIT,
   selectQualityExamples,
 } from '../utils/selectQualityExamples'
 
@@ -24,6 +26,16 @@ function toDisplaySentences(
     sentence: highlightWordInText(item.sentence, word),
     translation: item.translation || undefined,
   }))
+}
+
+/** 展示用：优先精选；精选为空时回退原文，避免已落库例句被打分筛光 */
+function pickDisplayExamples(
+  word: string,
+  examples: LocalExampleItem[],
+): LocalExampleItem[] {
+  if (!examples.length) return []
+  const curated = selectQualityExamples(word, examples)
+  return curated.length > 0 ? curated : examples.slice(0, QUALITY_EXAMPLE_LIMIT)
 }
 
 /**
@@ -48,6 +60,15 @@ export function useWordContextSentences() {
 
     try {
       await ensureLocalDictionary()
+      const key = word.trim().toLowerCase()
+      // 用户/AI 例句已落库则直接复用，不再因质量分过严而反复提示生成
+      const userExamples = await getUserExamplesForWord(key)
+      if (userExamples.length > 0) {
+        sentences.value = toDisplaySentences(word, pickDisplayExamples(word, userExamples))
+        needsAiExamples.value = false
+        return
+      }
+
       const raw = await lookupLocalExamples(word)
       const curated = selectQualityExamples(word, raw)
       sentences.value = toDisplaySentences(word, curated)
@@ -70,10 +91,9 @@ export function useWordContextSentences() {
 
     try {
       const generated = await generateQualityExamplesForWord(word, gloss)
-      const curated = selectQualityExamples(word, generated)
-      const display = curated.length > 0 ? curated : generated.slice(0, 3)
-      sentences.value = toDisplaySentences(word, display)
-      needsAiExamples.value = !hasEnoughQualityExamples(display)
+      sentences.value = toDisplaySentences(word, pickDisplayExamples(word, generated))
+      // 已成功落库，下次同一词直接读库，不再显示生成按钮
+      needsAiExamples.value = false
     } catch (err) {
       console.error('Failed to generate examples:', err)
       error.value = err instanceof Error ? err.message : 'AI 生成例句失败'

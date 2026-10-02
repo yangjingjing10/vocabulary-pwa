@@ -1,0 +1,25 @@
+---
+description: 功能/修复完成后自动提交并推送到 GitHub
+alwaysApply: true
+---
+
+# 自动推送到 GitHub
+
+远程仓库：https://github.com/yangjingjing10/vocabulary-pwa.git  
+分支：`main`（remote：`origin`）
+
+## 完成后必须做
+
+完成本次用户请求的功能或修复后，若工作区有未提交改动：
+
+1. `git add` 相关文件（不要加入密钥、`.env`、credentials）
+2. `git commit`（英文简洁说明 why，贴合本仓库既有风格）
+3. `git push origin HEAD`（需要网络权限）
+
+用户已授权：无需再询问是否提交/推送。
+
+## 禁止
+
+- `git push --force` / 改写已推送历史
+- 修改 `git config`
+- 跳过 hooks（除非用户明确要求）

@@ -5,9 +5,11 @@ import { ArrowLeft, Camera, Check, FileText, Image, Loader2, Save, Trash2, Uploa
 import { addWord } from '@/db/repositories/words.repository'
 import type { VocabularyWord } from '@/db/schema/database'
 import { resolveDefinitionsForImport } from '@/services/dictionary-api.service'
-import { todayLocalDate } from '@/utils/localDate'
+import { shiftLocalDate, todayLocalDate } from '@/utils/localDate'
 
 import '@/styles/pages/word-import-page.css'
+
+type ImportTargetDay = 'today' | 'tomorrow'
 
 interface WordItem {
   id: string
@@ -75,6 +77,17 @@ const manualInput = ref('')
 const useManualMode = ref(props.importType === 'manual')
 const words = ref<WordItem[]>([])
 const toastMessage = ref('')
+/** 写入词库的日历日：今天练 / 明天预习（后台可提前补例句） */
+const targetDay = ref<ImportTargetDay>('today')
+
+const targetDate = computed(() => {
+  const today = todayLocalDate()
+  return targetDay.value === 'tomorrow' ? shiftLocalDate(today, 1) : today
+})
+
+const targetDayLabel = computed(() =>
+  targetDay.value === 'tomorrow' ? `明天（${targetDate.value}）` : `今天（${targetDate.value}）`,
+)
 
 const hasContent = computed(() => ocrResult.value.trim() || manualInput.value.trim() || words.value.length > 0)
 
@@ -205,7 +218,7 @@ async function confirmSave() {
     )
 
     processingHint.value = 'Saving words...'
-    const today = todayLocalDate()
+    const saveDate = targetDate.value
     let withDefs = 0
 
     for (const item of words.value) {
@@ -214,7 +227,7 @@ async function confirmSave() {
         word: item.word,
         source: item.source,
         addedAt: Date.now(),
-        date: today,
+        date: saveDate,
       }
 
       const raw = definitions.get(item.word.toLowerCase())
@@ -231,24 +244,25 @@ async function confirmSave() {
 
     emit('save', words.value.map((w) => w.word))
 
-    // 导入后后台静默补例句（已有足够本地/用户例句的会跳过）
+    // 导入后后台静默补例句（今日+明日优先；已有足够例句的会跳过）
     const { examplePrefetchService } = await import('@/services/example-prefetch.service')
     examplePrefetchService.kick({
       limit: Math.min(30, Math.max(10, words.value.length)),
       delayMs: 1500,
     })
 
+    const dayNote = targetDay.value === 'tomorrow' ? '（明天）' : ''
     const phraseNote = filledPhrases > 0 ? `，短语补全 ${filledPhrases}` : ''
     if (missed > 0) {
       showToast(
-        `已保存 ${words.value.length} 词（本地 ${matchedLocal}，API/AI 补全 ${filledRemote}${phraseNote}，仍缺 ${missed}）`,
+        `已保存${dayNote} ${words.value.length} 词（本地 ${matchedLocal}，API/AI 补全 ${filledRemote}${phraseNote}，仍缺 ${missed}）`,
       )
     } else if (filledRemote > 0 || filledPhrases > 0) {
       showToast(
-        `已保存 ${words.value.length} 词（本地 ${matchedLocal}，API/AI 补全 ${filledRemote}${phraseNote}）`,
+        `已保存${dayNote} ${words.value.length} 词（本地 ${matchedLocal}，API/AI 补全 ${filledRemote}${phraseNote}）`,
       )
     } else {
-      showToast(`已保存 ${withDefs} 个带释义单词`)
+      showToast(`已保存${dayNote} ${withDefs} 个带释义单词`)
     }
   } catch (error) {
     showToast('Failed to save words')
@@ -336,9 +350,32 @@ async function confirmSave() {
     </Transition>
 
     <footer v-if="words.length > 0" class="import-save-bar">
-      <button type="button" @click="confirmSave">
+      <div class="import-target-day" role="group" aria-label="导入到哪一天">
+        <button
+          type="button"
+          class="import-target-day__chip"
+          :class="{ 'is-active': targetDay === 'today' }"
+          :disabled="isProcessing"
+          @click="targetDay = 'today'"
+        >
+          今天
+        </button>
+        <button
+          type="button"
+          class="import-target-day__chip"
+          :class="{ 'is-active': targetDay === 'tomorrow' }"
+          :disabled="isProcessing"
+          @click="targetDay = 'tomorrow'"
+        >
+          明天
+        </button>
+        <p class="import-target-day__hint">
+          {{ targetDay === 'tomorrow' ? '写入明天，今晚可后台预生成例句' : `写入 ${targetDayLabel}` }}
+        </p>
+      </div>
+      <button type="button" :disabled="isProcessing" @click="confirmSave">
         <Save :size="16" />
-        <span>Save {{ words.length }} words to vocabulary</span>
+        <span>保存 {{ words.length }} 词到{{ targetDay === 'tomorrow' ? '明天' : '今天' }}</span>
       </button>
     </footer>
 

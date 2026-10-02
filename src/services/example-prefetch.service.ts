@@ -11,7 +11,7 @@ import {
   hasEnoughQualityExamples,
   selectQualityExamples,
 } from '@/pages/word-quiz/utils/selectQualityExamples'
-import { todayLocalDate } from '@/utils/localDate'
+import { todayLocalDate, shiftLocalDate } from '@/utils/localDate'
 
 export type ExamplePrefetchStatus = 'idle' | 'running' | 'paused'
 
@@ -265,16 +265,18 @@ class ExamplePrefetchService {
     }, 800)
   }
 
-  /** 今日词优先，再按加入时间倒序 */
+  /** 今日 → 明日 → 其余（便于今晚预生成明天例句） */
   private async pickCandidates(
     words: VocabularyWord[],
     limit: number,
   ): Promise<Array<{ word: string; translation?: string }>> {
     const today = todayLocalDate()
+    const tomorrow = shiftLocalDate(today, 1)
     const seen = new Set<string>()
     const prioritized = [
       ...words.filter((w) => w.date === today),
-      ...words.filter((w) => w.date !== today),
+      ...words.filter((w) => w.date === tomorrow),
+      ...words.filter((w) => w.date !== today && w.date !== tomorrow),
     ]
 
     const out: Array<{ word: string; translation?: string }> = []

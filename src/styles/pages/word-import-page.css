@@ -309,14 +309,54 @@
   bottom: 0;
   left: 0;
   z-index: 20;
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  display: grid;
+  gap: 10px;
+  padding: 12px 16px calc(12px + var(--app-safe-bottom, env(safe-area-inset-bottom, 0px)));
   background: var(--import-surface);
   backdrop-filter: blur(12px);
   border-top: 1px solid var(--import-border);
   box-shadow: 0 -10px 24px rgba(15, 23, 42, 0.06);
 }
 
-.import-save-bar button {
+.import-target-day {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.import-target-day__chip {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+  background: rgba(241, 245, 249, 0.72);
+  color: var(--app-font-color-muted, #475569);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.import-target-day__chip.is-active {
+  border-color: #0f172a;
+  background: #0f172a;
+  color: #fff;
+}
+
+.import-target-day__chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.import-target-day__hint {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: var(--app-font-color-soft, #94a3b8);
+}
+
+.import-save-bar > button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -331,6 +371,11 @@
   font-weight: 800;
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+}
+
+.import-save-bar > button:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .import-toast {

@@ -94,7 +94,7 @@ src/pages/home/components/ReviewSetupModal.vue
 ================================================================================
 
 src/pages/word-import/WordImportPage.vue
-  — 相机/上传 OCR 或手输导入单词；补释义与固定搭配后写入本地词库。
+  — 相机/上传 OCR 或手输导入单词；保存前可选「今天 / 明天」写入日历日；补释义与固定搭配后写入本地词库；导入后 kick 例句预生成。
 
 ================================================================================
 五、单词本（vocabulary-book）
@@ -544,7 +544,7 @@ src/services/example-generation.service.ts
   — 测验中按需调用 LLM 生成可推义例句并写入本地索引（提示词要求健康文明、多义词取干净义）。
 
 src/services/example-prefetch.service.ts
-  — 后台静默为缺例句单词预生成（启动/导入后排队，今日词优先；不弹 toast；ring buffer 日志供控制台）。
+  — 后台静默为缺例句单词预生成（启动/导入后排队，今日→明日→其余；不弹 toast；ring buffer 日志供控制台）。
 
 src/services/wallpaper.service.ts
   — 应用 CSS 壁纸变量、轮播定时与变更订阅。

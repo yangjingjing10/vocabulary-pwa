@@ -293,7 +293,7 @@ function isCorrectOption(detail: ChoiceQuizRecordDetail, option: string) {
   align-items: center;
   gap: 10px;
   min-height: 56px;
-  padding: 8px 12px 8px 16px;
+  padding: calc(8px + var(--app-safe-top, 0px)) 12px 8px 16px;
   background: transparent;
   border-bottom: 1px solid transparent;
 }

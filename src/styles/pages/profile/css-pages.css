@@ -12,7 +12,7 @@
   align-items: center;
   gap: 12px;
   min-height: 56px;
-  padding: 0 16px;
+  padding: var(--app-safe-top, 0px) 16px 0;
   background: transparent;
   backdrop-filter: none;
   border-bottom: 1px solid transparent;
@@ -128,7 +128,7 @@
   align-items: center;
   gap: 12px;
   min-height: 56px;
-  padding: 0 16px;
+  padding: var(--app-safe-top, 0px) 16px 0;
   background: transparent;
   backdrop-filter: none;
   border-bottom: 1px solid transparent;
@@ -620,7 +620,7 @@
   align-items: center;
   gap: 12px;
   min-height: 56px;
-  padding: 0 16px;
+  padding: var(--app-safe-top, 0px) 16px 0;
   background: transparent;
   backdrop-filter: none;
   border-bottom: 1px solid transparent;

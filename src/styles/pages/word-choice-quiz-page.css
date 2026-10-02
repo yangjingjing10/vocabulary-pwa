@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
-  padding: 16px 20px 0;
+  padding: calc(16px + var(--app-safe-top, 0px)) 20px 0;
   max-width: 720px;
   width: 100%;
   margin: 0 auto;

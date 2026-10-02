@@ -215,7 +215,7 @@ watch(
   align-items: center;
   min-height: 56px;
   padding: 8px;
-  padding-top: max(8px, env(safe-area-inset-top));
+  padding-top: max(8px, var(--app-safe-top, env(safe-area-inset-top, 0px)));
   background: transparent;
 }
 
@@ -389,7 +389,7 @@ watch(
   align-items: flex-end;
   justify-content: center;
   padding: 16px;
-  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  padding-bottom: max(16px, var(--app-safe-bottom, env(safe-area-inset-bottom, 0px)));
   background: rgba(15, 23, 42, 0.35);
 }
 

@@ -34,8 +34,9 @@ function clampFontSize(size: number): number {
 
 function createDefaultDraft(): FontDraft {
   return {
-    source: null,
-    fontFamily: '',
+    source: 'system',
+    fontFamily: SYSTEM_FONT_LABEL,
+    fontAssetId: SYSTEM_FONT_ASSET_ID,
     color: DEFAULT_FONT_COLOR,
     fontSize: readInitialFontSize(),
   }
@@ -126,6 +127,11 @@ export function useFontSetting() {
           color: selected.color ?? DEFAULT_FONT_COLOR,
           fontSize: clampFontSize(selected.fontSize ?? DEFAULT_FONT_SIZE),
         }
+      } else {
+        // 下拉默认显示「系统默认」，草稿也必须同步，否则 canSave 一直为 false
+        draft.value = createDefaultDraft()
+        editingConfigId.value = null
+        editingConfigName.value = ''
       }
     } catch (error) {
       console.error('[useFontSetting] load failed:', error)

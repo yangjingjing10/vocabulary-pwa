@@ -446,7 +446,7 @@ async function reloadProfileAfterRestore() {
 .app-toast {
   position: fixed;
   left: 50%;
-  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(72px + var(--app-safe-bottom, env(safe-area-inset-bottom, 0px)));
   transform: translateX(-50%);
   z-index: 9999;
   display: flex;

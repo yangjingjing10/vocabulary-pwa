@@ -79,7 +79,7 @@ const emit = defineEmits<{
   z-index: 100;
   background: transparent;
   border-bottom: 1px solid rgba(148, 163, 184, 0.35);
-  padding: 1rem 1.5rem;
+  padding: calc(1rem + var(--app-safe-top, 0px)) 1.5rem 1rem;
   display: flex;
   align-items: center;
   gap: 1rem;

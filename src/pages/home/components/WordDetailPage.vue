@@ -265,6 +265,13 @@ function onRelatedClick(hit: RelatedWordHit) {
   }
 }
 
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  return Boolean(
+    target.closest('button, a, input, textarea, select, label, [role="button"]'),
+  )
+}
+
 function onPointerDown(clientX: number) {
   dragStartX = clientX
   isDragging = true
@@ -280,11 +287,25 @@ function onPointerUp(clientX: number) {
 }
 
 function onTouchStart(e: TouchEvent) {
+  // 交互控件上不启动滑动手势，避免吞掉 click
+  if (isInteractiveTarget(e.target)) {
+    isDragging = false
+    return
+  }
   onPointerDown(e.touches[0].clientX)
 }
 
 function onTouchEnd(e: TouchEvent) {
-  onPointerUp(e.changedTouches[0].clientX)
+  if (!isDragging) return
+  const deltaX = e.changedTouches[0].clientX - dragStartX
+  isDragging = false
+
+  // 轻点不 preventDefault，否则 Android 上后续 click 不会触发（展开按钮失效）
+  if (Math.abs(deltaX) < TAP_THRESHOLD) return
+
+  e.preventDefault()
+  if (deltaX < 0) void goTo('next')
+  else void goTo('prev')
   ignoreMouseUntil = Date.now() + 600
 }
 
@@ -366,7 +387,7 @@ onUnmounted(() => {
         class="word-detail__stage"
         :class="slideDir === 'next' ? 'is-dir-next' : 'is-dir-prev'"
         @touchstart.passive="onTouchStart"
-        @touchend.prevent="onTouchEnd"
+        @touchend="onTouchEnd"
         @touchcancel="onTouchCancel"
         @mousedown="onMouseDown"
         @mouseup="onMouseUp"
@@ -610,7 +631,7 @@ onUnmounted(() => {
   gap: 4px;
   min-height: 56px;
   padding: 8px 8px;
-  padding-top: max(8px, env(safe-area-inset-top));
+  padding-top: max(8px, var(--app-safe-top, env(safe-area-inset-top, 0px)));
 }
 
 .word-detail__icon-btn {

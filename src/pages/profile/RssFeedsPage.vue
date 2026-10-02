@@ -123,7 +123,7 @@ async function testFeed(feed: RssFeedConfig) {
   align-items: center;
   min-height: 56px;
   padding: 8px;
-  padding-top: max(8px, env(safe-area-inset-top));
+  padding-top: max(8px, var(--app-safe-top, env(safe-area-inset-top, 0px)));
   background: color-mix(in srgb, #f8fafc 86%, transparent);
   backdrop-filter: blur(8px);
 }

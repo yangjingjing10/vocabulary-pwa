@@ -13,6 +13,14 @@ const config: CapacitorConfig = {
     // https WebView 内请求 http Ollama
     allowMixedContent: true,
   },
+  plugins: {
+    // Android WebView <140 时 env(safe-area-*) 不可靠，注入 --safe-area-inset-*
+    SystemBars: {
+      insetsHandling: 'css',
+      initialViewportFitValueHint: 'cover',
+      style: 'DARK',
+    },
+  },
 }
 
 export default config

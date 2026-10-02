@@ -6,7 +6,7 @@
   justify-content: space-around;
   gap: 8px;
   min-height: 64px;
-  padding: 0 16px calc(env(safe-area-inset-bottom));
+  padding: 0 16px var(--app-safe-bottom, env(safe-area-inset-bottom, 0px));
   background: transparent;
   border-top: 1px solid rgba(148, 163, 184, 0.4);
 }

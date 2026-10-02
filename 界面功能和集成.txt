@@ -220,7 +220,8 @@ src/pages/article-read/utils/textDiff.ts
 
 【页面】
 src/pages/word-quiz/WordQuizPage.vue
-  — 英→中默写测验主流程：即时反馈、错题重练、暂停续测、结果与进阶选择题入口。
+  — 英→中默写测验主流程：即时反馈、错题重练、暂停续测、结果与进阶选择题入口；
+    暂停/结果正确率按首次作答统计，避免答错待重练时虚报全对。
 
 【组件】
 src/pages/word-quiz/components/QuizQuestion.vue
@@ -243,10 +244,15 @@ src/pages/word-quiz/components/QuizResumeDialog.vue
 
 【Composables】
 src/pages/word-quiz/composables/useQuizState.ts
-  — 测验题目队列、即时反馈、错题再入队、「算我对」覆盖判题与完成状态。
+  — 测验题目队列、即时反馈、错题再入队、「算我对」覆盖判题与完成状态；
+    正确率按「首次作答」统计，掌握结算按「最终/曾答对」另算。
 
 src/pages/word-quiz/composables/useQuizPause.ts
   — 按日期隔离的暂停批次持久化与续测。
+
+src/pages/word-quiz/WordQuizPage.vue
+  — 英→中默写测验主流程：即时反馈、错题重练、暂停续测、结果与进阶选择题入口；
+    暂停面板正确率计入尚未重练完的错题，避免虚报全对。
 
 src/pages/word-quiz/composables/useQuizGrading.ts
   — 基于本地词典规则批改对错（不调 AI）。

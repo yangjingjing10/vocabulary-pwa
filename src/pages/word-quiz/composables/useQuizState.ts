@@ -253,34 +253,69 @@ export function useQuizState(initialWords: string[], options: UseQuizStateOption
     return 'advanced'
   }
 
-  /** 按单词汇总：最终以最后一次作答为准；若曾答对则记为正确 */
+  function questionToResult(q: QuizQuestion): QuizResult {
+    const skipped = !q.userAnswer.trim()
+    return {
+      word: q.word,
+      userAnswer: skipped ? '' : q.userAnswer,
+      correctAnswer: q.gradeResult!.correctAnswer,
+      translation: q.translation,
+      isCorrect: skipped ? false : Boolean(q.gradeResult!.isCorrect),
+      direction: q.direction,
+      skipped,
+    }
+  }
+
+  /**
+   * 结果页 / 正确率：以每个单词的「首次作答」为准。
+   * 错题重练答对不抬高正确率，否则暂停/结业会虚报「全对」。
+   */
   function collectGradedResults(): QuizResult[] {
     const byWord = new Map<string, QuizResult>()
 
     for (const q of questions.value) {
       if (!q.gradeResult) continue
-      const skipped = !q.userAnswer.trim()
-      const next: QuizResult = {
-        word: q.word,
-        userAnswer: skipped ? '' : q.userAnswer,
-        correctAnswer: q.gradeResult.correctAnswer,
-        translation: q.translation,
-        isCorrect: skipped ? false : q.gradeResult.isCorrect,
-        direction: q.direction,
-        skipped,
-      }
-
-      const prev = byWord.get(q.word)
-      if (!prev) {
-        byWord.set(q.word, next)
-        continue
-      }
-      // 后一次覆盖；若此前已对而本次又错（不应出现），仍保留对
-      if (prev.isCorrect && !next.isCorrect) continue
-      byWord.set(q.word, next)
+      const key = q.word.trim().toLowerCase()
+      if (!key || byWord.has(key)) continue
+      byWord.set(key, questionToResult(q))
     }
 
     return [...byWord.values()]
+  }
+
+  /**
+   * 掌握结算：以最后一次作答为准；若曾答对则视为已掌握。
+   * 用于错题池搁置，与正确率展示分离。
+   */
+  function collectMasteryResults(): QuizResult[] {
+    const byWord = new Map<string, QuizResult>()
+
+    for (const q of questions.value) {
+      if (!q.gradeResult) continue
+      const key = q.word.trim().toLowerCase()
+      if (!key) continue
+      const next = questionToResult(q)
+      const prev = byWord.get(key)
+      if (!prev) {
+        byWord.set(key, next)
+        continue
+      }
+      if (prev.isCorrect && !next.isCorrect) continue
+      byWord.set(key, next)
+    }
+
+    return [...byWord.values()]
+  }
+
+  /** 当前会话里已有过判题的单词（含答错待重练） */
+  function getAttemptedWordKeys(): Set<string> {
+    const keys = new Set<string>()
+    for (const q of questions.value) {
+      if (!q.gradeResult) continue
+      const key = q.word.trim().toLowerCase()
+      if (key) keys.add(key)
+    }
+    return keys
   }
 
   function setResults(gradedResults: QuizResult[]) {
@@ -359,6 +394,8 @@ export function useQuizState(initialWords: string[], options: UseQuizStateOption
     overrideAsCorrect,
     acknowledgeFeedback,
     collectGradedResults,
+    collectMasteryResults,
+    getAttemptedWordKeys,
     setResults,
     retryQuiz,
     getAnsweredQuestions,

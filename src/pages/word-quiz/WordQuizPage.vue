@@ -64,6 +64,7 @@ const {
   skipQuestion,
   acknowledgeFeedback,
   collectGradedResults,
+  collectMasteryResults,
   setResults,
   setStatus,
   isQuestionSettled,
@@ -244,14 +245,48 @@ function persistQuestionByRef(
   })
 }
 
-async function persistSessionWrongs(batch: QuizBatch | null) {
-  if (!batch || !props.date) return
-  const wrongs = getWrongWords(batch)
+async function persistSessionWrongs(batch: QuizBatch | null, extraWrongWords: string[] = []) {
+  if (!props.date) return
+  const fromBatch = batch ? getWrongWords(batch) : []
+  const wrongs = [
+    ...new Set(
+      [...fromBatch, ...extraWrongWords]
+        .map((w) => w.trim())
+        .filter(Boolean),
+    ),
+  ]
   if (wrongs.length === 0) return
   try {
     await mergePendingWrongWords(props.date, wrongs)
   } catch (error) {
     console.error('Failed to save wrong words:', error)
+  }
+}
+
+/** 暂停面板：按首次作答统计，避免「答错未结算」被漏掉导致虚报全对 */
+function buildPauseDisplayResult(batch: QuizBatch): QuizPauseResult {
+  const sessionResults = collectGradedResults()
+  const checked = sessionResults.filter((r) => !r.skipped)
+  const correctCount = checked.filter((r) => r.isCorrect).length
+
+  return {
+    batchId: batch.batchId,
+    checkedCount: checked.length,
+    correctCount,
+    // 续测队列：未作答 + 答错尚未结算（仍留在 batch 待重练）
+    remainingCount: getPendingWords(batch).length,
+    results: checked.map((r) => ({
+      id: `session-${r.word}`,
+      word: r.word,
+      translation: r.translation || '',
+      direction: r.direction || 'en-to-zh',
+      userAnswer: r.userAnswer,
+      skipped: false,
+      aiResult: {
+        correct: r.isCorrect,
+        correctAnswer: r.correctAnswer,
+      },
+    })),
   }
 }
 
@@ -296,29 +331,44 @@ function batchWordToResult(word: QuizWord): QuizResult {
 }
 
 async function finishWithLocalResults() {
-  // 先把本轮最后几题写入 batch
+  // 先把本轮已结算题写入 batch（答对，或错/跳且不再重练）
   questions.value.forEach((q) => {
     if (!q.gradeResult || !currentBatch.value) return
+    if (!isQuestionSettled(q)) return
     persistQuestionByRef(q, !q.userAnswer.trim())
   })
 
   const sessionResults = collectGradedResults()
-  const sessionWords = new Set(sessionResults.map((r) => r.word))
+  const masteryResults = collectMasteryResults()
+  const sessionWords = new Set(
+    sessionResults.map((r) => r.word.trim().toLowerCase()),
+  )
 
   // 合并暂停前已完成的题，避免续测后结果页只剩后半段
   const earlierResults =
     currentBatch.value
       ? getCheckedWords(currentBatch.value)
-          .filter((w) => !sessionWords.has(w.word))
+          .filter((w) => !sessionWords.has(w.word.trim().toLowerCase()))
           .map(batchWordToResult)
       : []
 
-  setResults([...earlierResults, ...sessionResults])
+  const displayResults = [...earlierResults, ...sessionResults]
+  const masteryByWord = new Map(
+    [...earlierResults, ...masteryResults].map((r) => [
+      r.word.trim().toLowerCase(),
+      r,
+    ]),
+  )
+  const masteryMerged = [...masteryByWord.values()]
+
+  setResults(displayResults)
   isPartialResults.value = false
   remainingAfterPause.value = 0
-  const allResults = [...earlierResults, ...sessionResults]
-  await persistSessionWrongs(currentBatch.value)
-  await settleReviewProgress(allResults)
+  const sessionWrongWords = sessionResults
+    .filter((r) => !r.isCorrect)
+    .map((r) => r.word)
+  await persistSessionWrongs(currentBatch.value, sessionWrongWords)
+  await settleReviewProgress(masteryMerged)
   clearBatch()
 }
 
@@ -414,10 +464,15 @@ async function handlePause() {
 
   try {
     setStatus('grading')
-    const result = await pauseAndCheck(batch)
-    pauseResult.value = result
-    await persistSessionWrongs(batch)
-    await settleReviewProgress(getCheckedWords(batch).map(batchWordToResult))
+    // 仍落盘已结算题，供续测；面板数字改用首次作答，避免漏计未结算错题
+    await pauseAndCheck(batch)
+    const display = buildPauseDisplayResult(batch)
+    pauseResult.value = display
+    const sessionWrongWords = collectGradedResults()
+      .filter((r) => !r.isCorrect)
+      .map((r) => r.word)
+    await persistSessionWrongs(batch, sessionWrongWords)
+    await settleReviewProgress(collectMasteryResults())
     showPausePanel.value = true
     setStatus('testing')
   } catch (error) {
@@ -436,24 +491,29 @@ async function handleViewPauseResults() {
 
   const batch = currentBatch.value
   const remainingWords = getPendingWords(batch)
-  const checkedWords = getCheckedWords(batch)
-  const quizResults: QuizResult[] = checkedWords.map((word) => ({
-    word: word.word,
-    userAnswer: word.skipped ? '' : word.userAnswer,
-    correctAnswer: word.aiResult?.correctAnswer || getCorrectAnswer({
-      word: word.word,
-      translation: word.translation || '',
-      direction: word.direction || 'en-to-zh',
-    }),
-    translation: word.translation,
-    isCorrect: word.skipped ? false : Boolean(word.aiResult?.correct),
-    direction: word.direction,
-    skipped: Boolean(word.skipped),
-  }))
+
+  // 优先用会话内「首次作答」结果，再补上本轮会话之外、批次里已结算的题
+  const sessionResults = collectGradedResults()
+  const sessionKeys = new Set(
+    sessionResults.map((r) => r.word.trim().toLowerCase()),
+  )
+  const earlierResults = getCheckedWords(batch)
+    .filter((w) => !sessionKeys.has(w.word.trim().toLowerCase()))
+    .map(batchWordToResult)
+  const quizResults = [...earlierResults, ...sessionResults]
 
   setResults(quizResults)
-  await persistSessionWrongs(batch)
-  await settleReviewProgress(quizResults)
+  const sessionWrongWords = sessionResults
+    .filter((r) => !r.isCorrect)
+    .map((r) => r.word)
+  await persistSessionWrongs(batch, sessionWrongWords)
+  const masteryByWord = new Map(
+    [...earlierResults, ...collectMasteryResults()].map((r) => [
+      r.word.trim().toLowerCase(),
+      r,
+    ]),
+  )
+  await settleReviewProgress([...masteryByWord.values()])
 
   // 还有剩余题：保留批次，下次/本页可续测；不要 clearBatch
   if (remainingWords.length > 0) {

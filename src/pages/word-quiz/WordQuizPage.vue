@@ -69,6 +69,7 @@ const {
   isQuestionSettled,
   buildQuestion,
   markQuestionKnown,
+  overrideAsCorrect,
 } = useQuizState(props.words, { reviewMode: props.reviewMode })
 
 const pauseNamespace = computed(() =>

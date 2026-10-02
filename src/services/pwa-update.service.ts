@@ -1,8 +1,10 @@
 /**
  * PWA 更新：桌面安装版很难靠「下拉刷新」换新包，
  * 必须主动让 Service Worker 查新版本并跳过等待。
+ * Capacitor 原生壳内不注册 SW。
  */
 import { registerSW } from 'virtual:pwa-register'
+import { isNativeApp } from '@/utils/is-native-app'
 
 type UpdateListener = (hasUpdate: boolean) => void
 
@@ -49,7 +51,7 @@ function watchForWaitingWorker(reg: ServiceWorkerRegistration) {
 
 /** 应用启动时调用一次 */
 export function initPwaUpdate() {
-  if (started || typeof window === 'undefined') return
+  if (started || typeof window === 'undefined' || isNativeApp()) return
   started = true
 
   updateSW = registerSW({

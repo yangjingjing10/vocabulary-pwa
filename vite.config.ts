@@ -53,11 +53,15 @@ function rssProxyPlugin(): Plugin {
   }
 }
 
+// Capacitor 打包时禁用 Service Worker，避免与原生 WebView 冲突
+const isCapacitorBuild = process.env.CAPACITOR === 'true'
+
 export default defineConfig({
   plugins: [
     vue(),
     rssProxyPlugin(),
     VitePWA({
+      disable: isCapacitorBuild,
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon.svg'],
       manifest: {

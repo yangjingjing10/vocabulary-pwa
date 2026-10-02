@@ -1,10 +1,10 @@
 ================================================================================
 背单词软件（vocabulary-pwa）— 界面功能与文件清单
 ================================================================================
-项目类型：Vue 3 + TypeScript + Vite PWA（本地 IndexedDB）
+项目类型：Vue 3 + TypeScript + Vite PWA（本地 IndexedDB）；可选 Capacitor Android APK
 路由方式：无 vue-router；由 App.vue 的 activeView 切换视图
 文档范围：src 下 .vue / .ts 源文件 + 独立 CSS（不含 .vue.js 编译产物）
-更新日期：2026-09-17
+更新日期：2026-10-02
 
 --------------------------------------------------------------------------------
 一、应用视图总览（App.vue 可切换）
@@ -556,6 +556,9 @@ src/utils/localDate.ts
 src/utils/imageNormalize.ts
   — 将图片规范为受限尺寸 JPEG Data URL，供壁纸等存储。
 
+src/utils/is-native-app.ts
+  — 判断是否运行在 Capacitor 原生壳（Android/iOS）；用于跳过 PWA SW / Vite RSS 代理。
+
 ================================================================================
 十四、样式（styles）
 ================================================================================
@@ -639,3 +642,31 @@ src/styles/pages/profile/data-backup-page.css
    - 无需再向用户确认是否推送（用户已授权本仓库自动推送）
    - 不要 force push；不要改 git config；不要提交含密钥的 .env / credentials
    - 同步约定也写在：.cursor/rules/auto-push-github.mdc（alwaysApply）
+
+--------------------------------------------------------------------------------
+十六、Android APK（Capacitor）
+--------------------------------------------------------------------------------
+
+详细任务书：docs/capacitor-android-handoff.md
+
+【配置】
+  capacitor.config.ts — appId com.vocabulary.app，appName 背单词，webDir dist，androidScheme https
+  android/            — Capacitor 生成的原生工程（建议入库）
+
+【npm 脚本】
+  build:app  — CAPACITOR=true 构建（禁用 VitePWA Service Worker）
+  cap:sync   — build:app + npx cap sync android
+  cap:open   — 打开 Android Studio
+  cap:run    — sync 后直接跑到已连接设备
+
+【兼容改动】
+  - isNativeApp()：原生壳内不注册 PWA SW；个人中心隐藏「检查应用更新」
+  - rss.service：原生跳过 Vite /api/rss-proxy，走 allorigins
+  - vite.config：CAPACITOR=true 时 VitePWA disable: true
+
+【用户打包步骤】
+  1. 安装 Android Studio（SDK Platform 34+、Build-Tools）与 JDK 17
+  2. 设置 ANDROID_HOME，platform-tools 进 PATH
+  3. npm run cap:sync
+  4. npx cap open android → Build APK
+  5. Debug APK：android/app/build/outputs/apk/debug/app-debug.apk

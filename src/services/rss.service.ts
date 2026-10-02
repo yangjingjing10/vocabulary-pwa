@@ -3,6 +3,7 @@ import {
   RSS_FEEDS_STORAGE_KEY,
   type RssFeedConfig,
 } from '@/constants/rss-feeds'
+import { isNativeApp } from '@/utils/is-native-app'
 
 export interface RssItem {
   title: string
@@ -98,10 +99,10 @@ async function fetchViaAllOrigins(feedUrl: string): Promise<string> {
   return res.text()
 }
 
-/** 拉取单个 feed 的 XML 文本（开发走 Vite 代理，生产走 allorigins） */
+/** 拉取单个 feed 的 XML 文本（开发走 Vite 代理，生产/原生走 allorigins） */
 export async function fetchRssXml(feedUrl: string): Promise<string> {
-  // 开发环境优先本地代理，避免依赖第三方
-  if (import.meta.env.DEV) {
+  // Capacitor 无 Vite 代理；开发浏览器才走本地反代
+  if (import.meta.env.DEV && !isNativeApp()) {
     try {
       return await fetchViaLocalProxy(feedUrl)
     } catch (error) {
@@ -112,12 +113,15 @@ export async function fetchRssXml(feedUrl: string): Promise<string> {
   try {
     return await fetchViaAllOrigins(feedUrl)
   } catch (error) {
-    // 生产也再试一次本地路径（若用户自建了同路径反代）
-    try {
-      return await fetchViaLocalProxy(feedUrl)
-    } catch {
-      throw error
+    // 非原生时再试本地路径（若用户自建了同路径反代）
+    if (!isNativeApp()) {
+      try {
+        return await fetchViaLocalProxy(feedUrl)
+      } catch {
+        throw error
+      }
     }
+    throw error
   }
 }
 

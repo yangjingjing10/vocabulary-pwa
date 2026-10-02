@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { ChevronRight, Database, Newspaper, Smartphone, WandSparkles } from 'lucide-vue-next'
+import { isNativeApp } from '@/utils/is-native-app'
 
 interface SettingItem {
   type: 'data' | 'prompt' | 'rss' | 'pwa'
@@ -15,7 +17,7 @@ defineEmits<{
   openSetting: [type: SettingItem['type']]
 }>()
 
-const settings: SettingItem[] = [
+const allSettings: SettingItem[] = [
   {
     type: 'data',
     title: '数据配置与备份恢复',
@@ -53,6 +55,11 @@ const settings: SettingItem[] = [
     iconTone: 'slate'
   }
 ]
+
+/** 原生 APK 无 Service Worker，隐藏 PWA 更新入口 */
+const settings = computed(() =>
+  isNativeApp() ? allSettings.filter((s) => s.type !== 'pwa') : allSettings,
+)
 </script>
 
 <template>

@@ -37,10 +37,13 @@ import { getUserProfile } from '@/db/repositories/user-profile.repository'
 import type { ArticleGenPrefs } from '@/constants/article-gen-prefs'
 import { loadArticleGenPrefs } from '@/constants/article-gen-prefs'
 import { todayLocalDate } from '@/utils/localDate'
+import { isNativeApp } from '@/utils/is-native-app'
 
 import '@/styles/pages/home-page.css'
 
-initPwaUpdate()
+if (!isNativeApp()) {
+  initPwaUpdate()
+}
 
 const pwaUpdateReady = ref(false)
 let unsubscribePwaUpdate: (() => void) | undefined

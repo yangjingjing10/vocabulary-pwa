@@ -230,7 +230,7 @@ src/pages/word-quiz/components/WordCarousel.vue
   — 测验题干：始终显示当前单词。
 
 src/pages/word-quiz/components/WordContextSentences.vue
-  — 精选本地高质量例句；不够时可用 AI 生成可推义例句；展开后若尚未揭示中文释义，可在末尾「再提示」查看全部英文释义。
+  — 精选本地高质量例句（默认展开）；不够时可用 AI 生成可推义例句；尚未揭示中文词义时，可点「再提示 · 句译」在每句下方显示中文翻译（不再展示英文释义）。
 
 src/pages/word-quiz/components/QuizResults.vue
   — 测验结果页：正确率、错题/跳过列表与重试/进阶。

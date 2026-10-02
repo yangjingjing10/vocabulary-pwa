@@ -37,7 +37,7 @@ src/main.ts
   — 创建 Vue 应用并挂载 #app；启动时初始化壁纸、字体服务，引入全局样式。
 
 src/App.vue
-  — 根组件：注册 PWA Service Worker；维护全部页面视图与导航参数；
+  — 根组件：注册 PWA Service Worker（自动探活更新 + 新版本横幅）；维护全部页面视图与导航参数；
     订阅后台文章生成 toast；加载用户资料；协调各页面跳转与回传。
 
 src/components/navigation/BottomNavigation.vue
@@ -328,7 +328,7 @@ src/pages/profile/components/ProfileCssSettingCard.vue
   — 跳转自定义 CSS 的入口卡片。
 
 src/pages/profile/components/ProfileSettingsList.vue
-  — 数据备份 / 提示词 / 新闻源 RSS / PWA 等设置列表。
+  — 数据备份 / 提示词 / 新闻源 RSS / 检查应用更新 等设置列表。
 
 src/pages/profile/components/ProfileToast.vue
   — 个人页轻提示条。
@@ -543,6 +543,9 @@ src/services/practice-mix.service.ts
 src/services/review-session.service.ts
   — 复习组卷（混合/日期范围、题量、错题优先）与复习结算（对搁错留）。
 
+src/services/pwa-update.service.ts
+  — PWA 更新：前台/定时探活、检查更新、应用新版本、可选清理离线缓存（不删学习数据）。
+
 ================================================================================
 十三、工具（utils）
 ================================================================================
@@ -634,6 +637,4 @@ src/styles/pages/profile/data-backup-page.css
    【给后续 AI 的固定约定】
    - 完成本次功能/修复后，若工作区有未提交改动：先 git add → git commit → git push origin HEAD
    - 无需再向用户确认是否推送（用户已授权本仓库自动推送）
-   - 不要 force push；不要改 git config；不要提交含密钥的 .env / credentials
-   - 提交说明用英文、简洁，说明 why（与本仓库既有 commit 风格一致）
-   - 同步约定也写在：.cursor/rules/auto-push-github.mdc（alwaysApply）
+   - 不�

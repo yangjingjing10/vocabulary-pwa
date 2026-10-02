@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { registerSW } from 'virtual:pwa-register'
 
 import AiArticlePage from '@/pages/ai-article/AiArticlePage.vue'
 import ArticleHubPage from '@/pages/ai-article/ArticleHubPage.vue'
@@ -27,6 +26,11 @@ import { fontService } from '@/services/font.service'
 import { ensureLocalDictionary } from '@/services/local-dictionary.service'
 import { articleGenerationService } from '@/services/article-generation.service'
 import { examplePrefetchService } from '@/services/example-prefetch.service'
+import {
+  applyPwaUpdate,
+  initPwaUpdate,
+  onPwaUpdateAvailable,
+} from '@/services/pwa-update.service'
 import { mixYesterdayWrongWords } from '@/services/practice-mix.service'
 import { peekUnfinishedQuizBatch } from '@/pages/word-quiz/composables/useQuizPause'
 import { getUserProfile } from '@/db/repositories/user-profile.repository'
@@ -36,9 +40,16 @@ import { todayLocalDate } from '@/utils/localDate'
 
 import '@/styles/pages/home-page.css'
 
-registerSW({ immediate: true })
+initPwaUpdate()
+
+const pwaUpdateReady = ref(false)
+let unsubscribePwaUpdate: (() => void) | undefined
 
 onMounted(async () => {
+  unsubscribePwaUpdate = onPwaUpdateAvailable((ready) => {
+    pwaUpdateReady.value = ready
+  })
+
   await wallpaperService.init()
   await fontService.init()
   ensureLocalDictionary()
@@ -75,6 +86,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   unsubscribeArticleGen?.()
+  unsubscribePwaUpdate?.()
 })
 
 type View = 'study' | 'profile' | 'api' | 'css-index' | 'css-wallpaper' | 'css-font' | 'prompt-index' | 'article-prompt' | 'quiz-prompt' | 'data-backup' | 'rss-feeds' | 'import' | 'vocabulary' | 'article-hub' | 'article' | 'news-brief' | 'article-read' | 'word-quiz' | 'choice-quiz'
@@ -126,6 +138,10 @@ function openToastArticle() {
   selectedArticleId.value = appToastArticleId.value
   activeView.value = 'article-read'
   appToast.value = ''
+}
+
+function handleApplyPwaUpdate() {
+  void applyPwaUpdate(true)
 }
 
 function navigate(tab: 'study' | 'home') {
@@ -389,7 +405,23 @@ async function reloadProfileAfterRestore() {
 
   <Transition name="app-toast">
     <div
-      v-if="appToast"
+      v-if="pwaUpdateReady"
+      key="pwa-update"
+      class="app-toast app-toast--update"
+      role="status"
+    >
+      <span class="app-toast__text">发现新版本，点一下即可更新</span>
+      <button
+        type="button"
+        class="app-toast__action"
+        @click="handleApplyPwaUpdate"
+      >
+        立即更新
+      </button>
+    </div>
+    <div
+      v-else-if="appToast"
+      key="app-toast"
       class="app-toast"
       :class="{ 'is-error': appToastIsError }"
       role="status"
@@ -430,6 +462,10 @@ async function reloadProfileAfterRestore() {
   background: rgba(127, 29, 29, 0.94);
 }
 
+.app-toast--update {
+  background: rgba(15, 118, 110, 0.95);
+}
+
 .app-toast__text {
   flex: 1;
   font-size: 0.8125rem;
@@ -446,6 +482,11 @@ async function reloadProfileAfterRestore() {
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
+}
+
+.app-toast--update .app-toast__action {
+  background: #ecfdf5;
+  color: #0f766e;
 }
 
 .app-toast-enter-active,

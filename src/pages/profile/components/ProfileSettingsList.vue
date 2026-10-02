@@ -45,9 +45,9 @@ const settings: SettingItem[] = [
   },
   {
     type: 'pwa',
-    title: 'PWA 离线支持与关于',
-    description: '离线缓存 Service Worker 就绪，可安装至桌面',
-    badge: 'v1.0.0',
+    title: '检查应用更新',
+    description: '桌面版不会随下拉刷新自动换新，点这里检查并更新',
+    badge: 'PWA',
     badgeTone: 'slate',
     icon: Smartphone,
     iconTone: 'slate'

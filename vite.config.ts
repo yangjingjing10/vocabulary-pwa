@@ -79,6 +79,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // 新版本装上后立刻接管，避免手机桌面版一直卡在旧缓存
+        clientsClaim: true,
+        skipWaiting: true,
         cleanupOutdatedCaches: true,
         navigateFallback: '/index.html',
         // 词库约 4MB，不走 SW 预缓存；首次 fetch 后写入 IndexedDB

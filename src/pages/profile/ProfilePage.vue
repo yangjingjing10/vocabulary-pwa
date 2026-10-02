@@ -12,6 +12,11 @@ import ProfileHeader from './components/ProfileHeader.vue'
 import ProfileSettingsList from './components/ProfileSettingsList.vue'
 import ProfileStats from './components/ProfileStats.vue'
 import ProfileToast from './components/ProfileToast.vue'
+import {
+  applyPwaUpdate,
+  checkPwaUpdate,
+  clearPwaCachesAndReload,
+} from '@/services/pwa-update.service'
 
 import '@/styles/pages/profile/profile-page.css'
 
@@ -84,7 +89,7 @@ onMounted(async () => {
 function showToast(message: string) {
   toastMessage.value = message
   window.setTimeout(() => {
-    toastMessage.value = ''
+    if (toastMessage.value === message) toastMessage.value = ''
   }, 2500)
 }
 
@@ -113,6 +118,34 @@ async function handleUpdateName(name: string) {
   showToast('昵称已更新')
 }
 
+async function handleCheckPwaUpdate() {
+  showToast('正在检查更新…')
+  const result = await checkPwaUpdate()
+
+  if (result === 'ready') {
+    showToast('发现新版本，正在更新…')
+    await applyPwaUpdate(true)
+    return
+  }
+  if (result === 'latest') {
+    const force = window.confirm(
+      '当前已是最新版本。\n\n若页面仍像旧的，可强制清理离线缓存再刷新（不会删除你的单词/学习记录）。要清理吗？',
+    )
+    if (force) {
+      showToast('正在清理缓存…')
+      await clearPwaCachesAndReload()
+    } else {
+      showToast('已是最新版本')
+    }
+    return
+  }
+  if (result === 'unavailable') {
+    showToast('当前环境不支持离线更新检查')
+    return
+  }
+  showToast('检查更新失败，请稍后重试')
+}
+
 function openSettingPage(type: string) {
   if (type === 'api') {
     emit('openApi')
@@ -124,6 +157,8 @@ function openSettingPage(type: string) {
     emit('openDataBackup')
   } else if (type === 'rss') {
     emit('openRssFeeds')
+  } else if (type === 'pwa') {
+    void handleCheckPwaUpdate()
   } else {
     showToast(`${type} settings - Coming soon`)
   }

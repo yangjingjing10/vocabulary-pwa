@@ -94,6 +94,14 @@ function handleKeyDown(event: KeyboardEvent) {
         :current-index="currentIndex"
       />
 
+      <div class="quiz-example-slot">
+        <WordContextSentences
+          :word="question.word"
+          :gloss="question.translation"
+          :definition-revealed="isAnswerLocked"
+        />
+      </div>
+
       <div
         v-if="isAnswerLocked"
         class="quiz-feedback"
@@ -104,31 +112,13 @@ function handleKeyDown(event: KeyboardEvent) {
         <div class="quiz-feedback__answer">
           {{ feedbackCorrectAnswer }}
         </div>
-        <div class="quiz-feedback__actions">
-          <button
-            v-if="canOverrideCorrect"
-            type="button"
-            class="quiz-feedback__override"
-            @click="emit('override-correct')"
-          >
-            算我对
-          </button>
-          <button
-            type="button"
-            class="quiz-feedback__continue"
-            @click="emit('acknowledge')"
-          >
-            继续
-          </button>
-        </div>
-      </div>
-
-      <div class="quiz-example-slot">
-        <WordContextSentences
-          :word="question.word"
-          :gloss="question.translation"
-          :definition-revealed="isAnswerLocked"
-        />
+        <button
+          type="button"
+          class="quiz-feedback__continue"
+          @click="emit('acknowledge')"
+        >
+          继续
+        </button>
       </div>
     </div>
 
